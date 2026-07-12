@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  #root,#dc-root,x-dc,.sc-host{height:100%;min-height:0}
+  .ie-scroll{scrollbar-width:thin;scrollbar-color:rgba(140,140,140,.55) transparent}
+  .ie-scroll::-webkit-scrollbar{width:12px;height:12px}
+  .ie-scroll::-webkit-scrollbar-thumb{background:rgba(140,140,140,.55);border-radius:8px;border:3px solid transparent;background-clip:content-box}
+  .ie-scroll::-webkit-scrollbar-thumb:hover{background:rgba(140,140,140,.85);background-clip:content-box}
+  .ie-scroll::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+<div style="{{ t.page }}" ref="{{ setRoot }}">
+
+ <div style="{{ t.leftCol }}">
+  <div style="{{ t.head }}">
+    <div style="{{ t.headTop }}">
+      <div style="{{ t.title }}">{{ t.titleText }}</div>
+      <div style="{{ t.cpBadge }}">{{ cpLabel }}</div>
+    </div>
+    <div style="{{ t.headSub }}">item_proto.txt · item_names.txt</div>
+  </div>
+
+  <div style="{{ t.toolbar }}">
+    <div style="{{ t.ioRow }}">
+      <label style="{{ t.loadBtn }}">↑ Load proto<input type="file" accept=".txt,text/plain" onChange="{{ onLoadProto }}" style="{{ t.hiddenFile }}" /></label>
+      <label style="{{ t.loadBtn }}">↑ Load names<input type="file" accept=".txt,text/plain" onChange="{{ onLoadNames }}" style="{{ t.hiddenFile }}" /></label>
+      <button onClick="{{ onSample }}" style="{{ t.ghostBtn }}" title="Restore built-in sample data">Sample</button>
+      <div style="{{ t.ioSpacer }}"></div>
+      <button onClick="{{ onExport }}" style="{{ t.exportBtnTop }}">↓ Export both</button>
+    </div>
+    <div style="{{ t.ctrlRow }}">
+      <div style="{{ t.dualLabel }}">
+        <label style="{{ t.ctrlLabel }}">LOCALE_NAME charset</label>
+        <label style="{{ t.ctrlLabel }}">NAME(K)</label>
+      </div>
+      <div style="{{ t.dualCtrl }}">
+        <select value="{{ locale }}" onChange="{{ onLocale }}" style="{{ t.select }}">
+          <sc-for list="{{ localeOpts }}" as="lo" hint-placeholder-count="3">
+            <option value="{{ lo.code }}">{{ lo.label }}</option>
+          </sc-for>
+        </select>
+        <button onClick="{{ onNameCp }}" style="{{ nameCpBtnStyle }}" title="NAME(K) is throwaway text — toggle its charset">{{ nameCpLabel }}</button>
+      </div>
+    </div>
+    <input value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search vnum / range (100-200) / name…" style="{{ t.searchInput }}" />
+    <div style="{{ t.ctrlRow2 }}">
+      <select value="{{ typeFilter }}" onChange="{{ onType }}" style="{{ t.selectSm }}">
+        <sc-for list="{{ typeOpts }}" as="ty" hint-placeholder-count="3">
+          <option value="{{ ty }}">{{ ty }}</option>
+        </sc-for>
+      </select>
+      <button onClick="{{ onToggleMissing }}" style="{{ missingBtnStyle }}">⌀ untranslated</button>
+      <button onClick="{{ onAdd }}" style="{{ t.addBtn }}">+ New</button>
+    </div>
+  </div>
+
+  <div style="{{ t.legend }}">
+    <span style="{{ t.legendItem }}"><span style="{{ t.legendDotSafe }}"></span>ASCII — always safe</span>
+    <span style="{{ t.legendItem }}"><span style="{{ t.legendDotWarn }}">⚠</span>not encodable in {{ cpLabel }}</span>
+  </div>
+
+  <div style="{{ t.listWrap }}" class="ie-scroll">
+    <sc-if value="{{ isTable }}" hint-placeholder-val="{{ true }}">
+      <div style="{{ t.headerRow }}">
+        <span style="{{ t.thVnum }}">VNUM</span>
+        <span style="{{ t.thName }}">LOCALE_NAME · name(k)</span>
+        <span style="{{ t.thType }}">TYPE</span>
+        <span style="{{ t.thGold }}">GOLD</span>
+      </div>
+    </sc-if>
+    <sc-for list="{{ visibleRows }}" as="row" hint-placeholder-count="6">
+      <div style="{{ row.style }}" onClick="{{ row.onClick }}">
+        <sc-if value="{{ showGutter }}" hint-placeholder-val="{{ true }}"><span style="{{ t.gutter }}">{{ row.idx }}</span></sc-if>
+        <span style="{{ t.vnum }}">{{ row.vnum }}</span>
+        <div style="{{ t.nameCell }}">
+          <div style="{{ t.nameLine }}">
+            <span style="{{ row.primaryStyle }}">{{ row.primary }}</span>
+            <sc-if value="{{ row.primaryWarn }}" hint-placeholder-val="{{ false }}"><span style="{{ t.warnDot }}">⚠</span></sc-if>
+          </div>
+          <div style="{{ t.nameLine }}">
+            <span style="{{ row.secondaryStyle }}">{{ row.secondary }}</span>
+            <sc-if value="{{ row.secondaryWarn }}" hint-placeholder-val="{{ false }}"><span style="{{ t.warnDotSm }}">⚠</span></sc-if>
+          </div>
+        </div>
+        <span style="{{ row.badgeStyle }}">{{ row.typeShort }}</span>
+        <span style="{{ t.gold }}">{{ row.goldLabel }}</span>
+      </div>
+    </sc-for>
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ t.emptyState }}">No items match this filter.</div>
+    </sc-if>
+  </div>
+
+  <div style="{{ t.footer }}">
+    <span style="{{ t.count }}">{{ shownCount }} / {{ totalCount }} items{{ dirtyLabel }}</span>
+    <button onClick="{{ onExport }}" style="{{ t.exportBtn }}">↓ Export</button>
+  </div>
+ </div>
+
+  <sc-if value="{{ exportMsg }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ t.toast }}">{{ exportMsg }}</div>
+  </sc-if>
+
+  <sc-if value="{{ showOverlay }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ t.overlay }}" onClick="{{ onClose }}"></div>
+  </sc-if>
+
+  <sc-if value="{{ showPanel }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ t.panel }}">
+     <sc-if value="{{ panelEmpty }}" hint-placeholder-val="{{ false }}">
+       <div style="{{ t.panelEmpty }}"><div style="{{ t.panelEmptyIcon }}">⌗</div>Select an item on the left to edit its fields, flags and names.</div>
+     </sc-if>
+     <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ t.drawerHead }}">
+        <div>
+          <div style="{{ t.drawerVnum }}">#{{ editVnum }}</div>
+          <div style="{{ t.drawerName }}">{{ editName }}</div>
+        </div>
+        <button onClick="{{ onClose }}" style="{{ t.closeBtn }}">{{ closeLabel }}</button>
+      </div>
+      <div style="{{ t.drawerBody }}" class="ie-scroll">
+        <sc-for list="{{ editGroups }}" as="grp" hint-placeholder-count="3">
+          <div style="{{ t.groupTitle }}">{{ grp.title }}</div>
+          <div style="{{ t.fieldGrid }}">
+            <sc-for list="{{ grp.fields }}" as="f" hint-placeholder-count="3">
+              <div style="{{ f.wrapStyle }}">
+                <div style="{{ t.fieldLabelRow }}">
+                  <label style="{{ t.fieldLabel }}">{{ f.label }}</label>
+                  <sc-if value="{{ f.warn }}" hint-placeholder-val="{{ false }}"><span style="{{ t.fieldWarn }}">⚠ not in {{ f.warnCp }}</span></sc-if>
+                </div>
+                <sc-if value="{{ f.isEnum }}" hint-placeholder-val="{{ true }}">
+                  <select value="{{ f.value }}" onChange="{{ f.onInput }}" style="{{ f.inputStyle }}">
+                    <sc-for list="{{ f.options }}" as="opt" hint-placeholder-count="3">
+                      <option value="{{ opt }}">{{ opt }}</option>
+                    </sc-for>
+                  </select>
+                </sc-if>
+                <sc-if value="{{ f.isText }}" hint-placeholder-val="{{ false }}">
+                  <input value="{{ f.value }}" onChange="{{ f.onInput }}" inputmode="{{ f.inputMode }}" style="{{ f.inputStyle }}" />
+                </sc-if>
+                <sc-if value="{{ f.isFlags }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ t.chipWrap }}">
+                    <sc-for list="{{ f.chips }}" as="c" hint-placeholder-count="6">
+                      <button onClick="{{ c.onToggle }}" title="{{ c.title }}" style="{{ c.style }}">{{ c.label }}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="{{ t.drawerFoot }}">
+        <button onClick="{{ onDelete }}" style="{{ t.delBtn }}">Delete</button>
+        <button onClick="{{ onClone }}" style="{{ t.cloneBtn }}">Duplicate</button>
+        <button onClick="{{ onClose }}" style="{{ t.doneBtn }}">Done</button>
+      </div>
+     </sc-if>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:780},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;grid&quot;,&quot;ide&quot;,&quot;fantasy&quot;],&quot;default&quot;:&quot;ide&quot;,&quot;tsType&quot;:&quot;'grid'|'ide'|'fantasy'&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:null,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;desktop&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:null,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;}}">
+class Component extends DCLogic {
+  static DEFAULTS = {vnum:'0',nameK:'',type:'ITEM_NONE',subType:'0',size:'1',antiFlag:'NONE',flag:'NONE',wear:'NONE',immune:'NONE',gold:'0',shopBuy:'0',refine:'0',refineSet:'0',magicPct:'0',limitType0:'LIMIT_NONE',limitValue0:'0',limitType1:'LIMIT_NONE',limitValue1:'0',addonType0:'APPLY_NONE',addonValue0:'0',addonType1:'APPLY_NONE',addonValue1:'0',addonType2:'APPLY_NONE',addonValue2:'0',value0:'0',value1:'0',value2:'0',value3:'0',value4:'0',value5:'0',specular:'0',socket:'0',attuAddon:'0',locale:null,nameK:null};
+
+  static SAMPLE = [
+    {vnum:'10',bytes:[181,181,43,48],locale:'Sword+0',type:'ITEM_WEAPON',subType:'WEAPON_SWORD',size:'2',antiFlag:'ANTI_MUDANG | ANTI_WOLFMAN',flag:'ITEM_TUNABLE',wear:'WEAR_WEAPON',refine:'11',refineSet:'1',magicPct:'15',limitType0:'LEVEL',addonType0:'APPLY_ATT_SPEED',addonValue0:'22',value1:'15',value2:'19',value3:'13',value4:'15',socket:'1'},
+    {vnum:'20',bytes:[192,229,176,203,43,48],locale:'Long Sword+0',type:'ITEM_WEAPON',subType:'WEAPON_SWORD',size:'2',antiFlag:'ANTI_MUDANG | ANTI_WOLFMAN',flag:'ITEM_TUNABLE',wear:'WEAR_WEAPON',gold:'400',shopBuy:'400',refine:'21',refineSet:'1',magicPct:'15',limitType0:'LEVEL',limitValue0:'5',addonType0:'APPLY_ATT_SPEED',addonValue0:'27',value1:'13',value2:'15',value3:'15',value4:'19',socket:'1'},
+    {vnum:'4012',bytes:[177,184,196,161,177,184,43,50],locale:'Nine Blades+2',type:'ITEM_WEAPON',subType:'WEAPON_DAGGER',size:'1',antiFlag:'ANTI_MUSA | ANTI_SURA | ANTI_MUDANG | ANTI_WOLFMAN',flag:'ITEM_TUNABLE',wear:'WEAR_WEAPON',gold:'800',shopBuy:'1000',refine:'4013',refineSet:'57',magicPct:'15',limitType0:'LEVEL',limitValue0:'15',addonType0:'APPLY_ATT_SPEED',addonValue0:'19',value2:'14',value3:'16',value4:'8',socket:'1'},
+    {vnum:'4020',bytes:[188,210,197,194,181,181,43,48],locale:'Short Knife+0',type:'ITEM_WEAPON',subType:'WEAPON_DAGGER',size:'1',antiFlag:'ANTI_MUSA | ANTI_SURA | ANTI_MUDANG | ANTI_WOLFMAN',flag:'ITEM_TUNABLE',wear:'WEAR_WEAPON',gold:'5000',shopBuy:'5000',refine:'4021',refineSet:'64',magicPct:'15',limitType0:'LEVEL',limitValue0:'25',addonType0:'APPLY_ATT_SPEED',addonValue0:'27',value2:'28',value3:'32',socket:'2'},
+    {vnum:'11852',bytes:[192,207,188,177,192,199,43,50],locale:'Warrior Plate+2',type:'ITEM_ARMOR',subType:'ARMOR_BODY',size:'2',antiFlag:'ANTI_MUSA | ANTI_ASSASSIN | ANTI_SURA | ANTI_WOLFMAN',flag:'ITEM_TUNABLE',wear:'WEAR_BODY',gold:'15000',shopBuy:'20000',refine:'11853',refineSet:'174',magicPct:'15',limitType0:'LEVEL',limitValue0:'42',addonType0:'APPLY_MOV_SPEED',addonValue0:'-8',value0:'55',value2:'8',value4:'6',socket:'2'},
+    {vnum:'11860',bytes:[195,181,183,251,192,199,43,48],locale:'Heaven Robe+0',type:'ITEM_ARMOR',subType:'ARMOR_BODY',size:'2',antiFlag:'ANTI_MUSA | ANTI_ASSASSIN | ANTI_SURA | ANTI_WOLFMAN',flag:'ITEM_TUNABLE',wear:'WEAR_BODY',gold:'80000',shopBuy:'80000',refine:'11861',refineSet:'181',magicPct:'15',limitType0:'LEVEL',limitValue0:'48',addonType0:'APPLY_MOV_SPEED',addonValue0:'-10',value0:'64',value2:'9',socket:'3'},
+    {vnum:'38200',bytes:[190,198,177,226,192,252,176,169,182,251,188,210,200,175,198,208],locale:'Baby Haetae Summon',type:'ITEM_PET',subType:'PET_PAY',size:'1',antiFlag:'ANTI_DROP | ANTI_SELL | ANTI_GIVE | ANTI_STACK | ANTI_MYSHOP',flag:'LOG',addonType0:'APPLY_MELEE_MAGIC_ATTBONUS_PER',addonValue0:'15',addonType1:'APPLY_MAX_HP',addonValue1:'1500',value0:'34006'},
+    {vnum:'39001',bytes:[199,246,195,182],locale:'Steel',type:'ITEM_USE',subType:'USE_TUNING',size:'1',antiFlag:'ANTI_DROP | ANTI_SELL | ANTI_PKDROP | ANTI_STACK | ANTI_MYSHOP',gold:'5000',shopBuy:'5000',value0:'1'},
+    {vnum:'39003',bytes:[181,181,200,173,193,214],locale:'Regeneration Potion',type:'ITEM_USE',subType:'USE_POTION_NODELAY',size:'1',antiFlag:'ANTI_DROP | ANTI_SELL | ANTI_PKDROP | ANTI_STACK | ANTI_MYSHOP',flag:'ITEM_STACKABLE | ITEM_SLOW_QUERY',gold:'1000',shopBuy:'1000',value0:'500'},
+    {vnum:'39004',bytes:[195,224,186,185,192,199,32,177,184,189,189],locale:'Blessing Marble',type:'ITEM_USE',subType:'USE_ADD_ATTRIBUTE2',size:'1',antiFlag:'ANTI_DROP | ANTI_SELL | ANTI_PKDROP | ANTI_STACK | ANTI_MYSHOP',flag:'LOG',gold:'30000000',shopBuy:'50000'},
+    {vnum:'39002',bytes:[176,230,199,232,192,199,185,221,193,246],locale:'Spirit Stone Shield',type:'ITEM_UNIQUE',subType:'UNIQUE_NONE',size:'1',antiFlag:'ANTI_DROP | ANTI_SELL | ANTI_PKDROP | ANTI_STACK | ANTI_MYSHOP',flag:'CONFIRM_WHEN_USE',wear:'WEAR_SHIELD',value0:'60'},
+    {vnum:'38101',bytes:[192,204,198,196,192,199,32,187,243,192,218],locale:'',type:'ITEM_QUEST',subType:'0',size:'1',antiFlag:'ANTI_DROP | ANTI_SELL | ANTI_GIVE | ANTI_PKDROP | ANTI_STACK | ANTI_MYSHOP'}
+  ];
+
+  static COLS = ['vnum','nameK','type','subType','size','antiFlag','flag','wear','immune','gold','shopBuy','refine','refineSet','magicPct','limitType0','limitValue0','limitType1','limitValue1','addonType0','addonValue0','addonType1','addonValue1','addonType2','addonValue2','value0','value1','value2','value3','value4','value5','specular','socket','attuAddon'];
+  static HEADERS = ['ITEM_VNUM~RANGE','ITEM_NAME(K)','ITEM_TYPE','SUB_TYPE','SIZE','ANTI_FLAG','FLAG','ITEM_WEAR','IMMUNE','GOLD','SHOP_BUY_PRICE','REFINE','REFINESET','MAGIC_PCT','LIMIT_TYPE0','LIMIT_VALUE0','LIMIT_TYPE1','LIMIT_VALUE1','ADDON_TYPE0','ADDON_VALUE0','ADDON_TYPE1','ADDON_VALUE1','ADDON_TYPE2','ADDON_VALUE2','VALUE0','VALUE1','VALUE2','VALUE3','VALUE4','VALUE5','Specular','SOCKET','ATTU_ADDON'];
+
+  static LOCALES = [['utf8','Unicode (UTF-8) · any char','utf8'],['ae','Arabic (CP1256)','1256'],['cz','Czech (CP1250)','1250'],['de','German (CP1252)','1252'],['dk','Danish (CP1252)','1252'],['en','English (CP1252)','1252'],['es','Spanish (CP1252)','1252'],['fr','French (CP1252)','1252'],['gr','Greek (CP1253)','1253'],['hu','Hungarian (CP1250)','1250'],['it','Italian (CP1252)','1252'],['nl','Dutch (CP1252)','1252'],['pl','Polish (CP1250)','1250'],['pt','Portuguese (CP1252)','1252'],['ro','Romanian (CP1250)','1250'],['tr','Turkish (CP1254)','1254']];
+
+  static ANTI = ["ANTI_FEMALE","ANTI_MALE","ANTI_MUSA","ANTI_ASSASSIN","ANTI_SURA","ANTI_MUDANG","ANTI_GET","ANTI_DROP","ANTI_SELL","ANTI_EMPIRE_A","ANTI_EMPIRE_B","ANTI_EMPIRE_C","ANTI_SAVE","ANTI_GIVE","ANTI_PKDROP","ANTI_STACK","ANTI_MYSHOP","ANTI_SAFEBOX","ANTI_WOLFMAN","ANTI_PET20","ANTI_PET21"];
+  static FLAGS = ["ITEM_TUNABLE","ITEM_SAVE","ITEM_STACKABLE","COUNT_PER_1GOLD","ITEM_SLOW_QUERY","ITEM_UNIQUE","ITEM_MAKECOUNT","ITEM_IRREMOVABLE","CONFIRM_WHEN_USE","QUEST_USE","QUEST_USE_MULTIPLE","QUEST_GIVE","ITEM_QUEST","LOG","STACKABLE","SLOW_QUERY","REFINEABLE","IRREMOVABLE","ITEM_APPLICABLE"];
+  static ITEMTYPES = ["ITEM_NONE","ITEM_WEAPON","ITEM_ARMOR","ITEM_USE","ITEM_AUTOUSE","ITEM_MATERIAL","ITEM_SPECIAL","ITEM_TOOL","ITEM_LOTTERY","ITEM_ELK","ITEM_METIN","ITEM_CONTAINER","ITEM_FISH","ITEM_ROD","ITEM_RESOURCE","ITEM_CAMPFIRE","ITEM_UNIQUE","ITEM_SKILLBOOK","ITEM_QUEST","ITEM_POLYMORPH","ITEM_TREASURE_BOX","ITEM_TREASURE_KEY","ITEM_SKILLFORGET","ITEM_GIFTBOX","ITEM_PICK","ITEM_HAIR","ITEM_TOTEM","ITEM_BLEND","ITEM_COSTUME","ITEM_DS","ITEM_SPECIAL_DS","ITEM_EXTRACT","ITEM_SECONDARY_COIN","ITEM_RING","ITEM_BELT","ITEM_PET","ITEM_MEDIUM","ITEM_GACHA","ITEM_SOUL","ITEM_PASSIVE","ITEM_ALCHEMY"];
+  static LIMIT = ["LIMIT_NONE","LEVEL","STR","DEX","INT","CON","PC_BANG","REAL_TIME","REAL_TIME_FIRST_USE","TIMER_BASED_ON_WEAR"];
+  static WEAR = ["NONE","WEAR_BODY","WEAR_HEAD","WEAR_FOOTS","WEAR_WRIST","WEAR_WEAPON","WEAR_NECK","WEAR_EAR","WEAR_SHIELD","WEAR_UNIQUE","WEAR_ARROW","WEAR_HAIR","WEAR_ABILITY","WEAR_PENDANT","WEAR_GLOVE"];
+  static APPLY = ["APPLY_NONE","APPLY_MAX_HP","APPLY_MAX_SP","APPLY_CON","APPLY_INT","APPLY_STR","APPLY_DEX","APPLY_ATT_SPEED","APPLY_MOV_SPEED","APPLY_CAST_SPEED","APPLY_HP_REGEN","APPLY_SP_REGEN","APPLY_POISON_PCT","APPLY_STUN_PCT","APPLY_SLOW_PCT","APPLY_CRITICAL_PCT","APPLY_PENETRATE_PCT","APPLY_ATTBONUS_HUMAN","APPLY_ATTBONUS_ANIMAL","APPLY_ATTBONUS_ORC","APPLY_ATTBONUS_MILGYO","APPLY_ATTBONUS_UNDEAD","APPLY_ATTBONUS_DEVIL","APPLY_STEAL_HP","APPLY_STEAL_SP","APPLY_MANA_BURN_PCT","APPLY_DAMAGE_SP_RECOVER","APPLY_BLOCK","APPLY_DODGE","APPLY_RESIST_SWORD","APPLY_RESIST_TWOHAND","APPLY_RESIST_DAGGER","APPLY_RESIST_BELL","APPLY_RESIST_FAN","APPLY_RESIST_BOW","APPLY_RESIST_FIRE","APPLY_RESIST_ELEC","APPLY_RESIST_MAGIC","APPLY_RESIST_WIND","APPLY_REFLECT_MELEE","APPLY_REFLECT_CURSE","APPLY_POISON_REDUCE","APPLY_KILL_SP_RECOVER","APPLY_EXP_DOUBLE_BONUS","APPLY_GOLD_DOUBLE_BONUS","APPLY_ITEM_DROP_BONUS","APPLY_POTION_BONUS","APPLY_KILL_HP_RECOVER","APPLY_IMMUNE_STUN","APPLY_IMMUNE_SLOW","APPLY_IMMUNE_FALL","APPLY_SKILL","APPLY_BOW_DISTANCE","APPLY_ATT_GRADE_BONUS","APPLY_DEF_GRADE_BONUS","APPLY_MAGIC_ATT_GRADE","APPLY_MAGIC_DEF_GRADE","APPLY_CURSE_PCT","APPLY_MAX_STAMINA","APPLY_ATTBONUS_WARRIOR","APPLY_ATTBONUS_ASSASSIN","APPLY_ATTBONUS_SURA","APPLY_ATTBONUS_SHAMAN","APPLY_ATTBONUS_MONSTER","APPLY_MALL_ATTBONUS","APPLY_MALL_DEFBONUS","APPLY_MALL_EXPBONUS","APPLY_MALL_ITEMBONUS","APPLY_MALL_GOLDBONUS","APPLY_MAX_HP_PCT","APPLY_MAX_SP_PCT","APPLY_SKILL_DAMAGE_BONUS","APPLY_NORMAL_HIT_DAMAGE_BONUS","APPLY_SKILL_DEFEND_BONUS","APPLY_NORMAL_HIT_DEFEND_BONUS","APPLY_PC_BANG_EXP_BONUS","APPLY_PC_BANG_DROP_BONUS","APPLY_EXTRACT_HP_PCT","APPLY_RESIST_WARRIOR","APPLY_RESIST_ASSASSIN","APPLY_RESIST_SURA","APPLY_RESIST_SHAMAN","APPLY_ENERGY","APPLY_DEF_GRADE","APPLY_COSTUME_ATTR_BONUS","APPLY_MAGIC_ATTBONUS_PER","APPLY_MELEE_MAGIC_ATTBONUS_PER","APPLY_RESIST_ICE","APPLY_RESIST_EARTH","APPLY_RESIST_DARK","APPLY_ANTI_CRITICAL_PCT","APPLY_ANTI_PENETRATE_PCT","APPLY_BLEEDING_REDUCE","APPLY_BLEEDING_PCT","APPLY_ATTBONUS_WOLFMAN","APPLY_RESIST_WOLFMAN","APPLY_RESIST_CLAW","APPLY_ACCEDRAIN_RATE","APPLY_RESIST_MAGIC_REDUCTION","APPLY_ENCHANT_ELECT","APPLY_ENCHANT_FIRE","APPLY_ENCHANT_ICE","APPLY_ENCHANT_WIND","APPLY_ENCHANT_EARTH","APPLY_ENCHANT_DARK","APPLY_ATTBONUS_CZ","APPLY_ATTBONUS_INSECT","APPLY_ATTBONUS_DESERT","APPLY_ATTBONUS_SWORD","APPLY_ATTBONUS_TWOHAND","APPLY_ATTBONUS_DAGGER","APPLY_ATTBONUS_BELL","APPLY_ATTBONUS_FAN","APPLY_ATTBONUS_BOW","APPLY_ATTBONUS_CLAW","APPLY_RESIST_HUMAN","APPLY_RESIST_MOUNT_FALL","APPLY_UNK117","APPLY_MOUNT"];
+
+  static EXTRA = {
+    '1252':'€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ',
+    '1250':'€‚„…†‡‰Š‹ŚŤŽŹ‘’“”•–—™š›śťžź¡ˇ˘Ł¤Ą¦§¨©Ş«¬®Ż°±˛ł´µ¶·¸ąş»Ľ˝ľżŔÁÂĂÄĹĆÇČÉĘËĚÍÎĎĐŃŇÓÔŐÖ×ŘŮÚŰÜÝŢßŕáâăäĺćçčéęëěíîďđńňóôőö÷řůúűüýţ˙',
+    '1253':'€‚ƒ„…†‡‰‹‘’“”•–—™›΅Ά£¤¥¦§¨©«¬®―°±²³΄µ¶·ΈΉΊ»Ό½ΎΏΐΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩΪΫάέήίΰαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώ',
+    '1254':'€‚ƒ„…†‡ˆ‰Š‹Œ‘’“”•–—˜™š›œŸ¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖ×ØÙÚÛÜİŞßàáâãäåæçèéêëìíîïğñòóôõö÷øùúûüışÿ'
+  };
+
+  static FIELD = {
+    vnum:{label:'VNUM',kind:'num'}, nameK:{label:'NAME(K) · throwaway source text',kind:'text',span:2}, locale:{label:'LOCALE_NAME · localized string',kind:'text',span:2},
+    type:{label:'Item type',kind:'enum',options:Component.ITEMTYPES,span:2},
+    subType:{label:'Sub type',kind:'text'}, size:{label:'Size',kind:'num'},
+    gold:{label:'Gold',kind:'num'}, shopBuy:{label:'Shop buy',kind:'num'}, refine:{label:'Refine → vnum',kind:'num'}, refineSet:{label:'Refine set',kind:'num'}, magicPct:{label:'Magic %',kind:'num'},
+    limitType0:{label:'Limit 0',kind:'enum',options:Component.LIMIT}, limitValue0:{label:'Value 0',kind:'num'},
+    limitType1:{label:'Limit 1',kind:'enum',options:Component.LIMIT}, limitValue1:{label:'Value 1',kind:'num'},
+    addonType0:{label:'Addon 0',kind:'enum',options:Component.APPLY}, addonValue0:{label:'Value 0',kind:'num'},
+    addonType1:{label:'Addon 1',kind:'enum',options:Component.APPLY}, addonValue1:{label:'Value 1',kind:'num'},
+    addonType2:{label:'Addon 2',kind:'enum',options:Component.APPLY}, addonValue2:{label:'Value 2',kind:'num'},
+    value0:{label:'V0',kind:'num'}, value1:{label:'V1',kind:'num'}, value2:{label:'V2',kind:'num'}, value3:{label:'V3',kind:'num'}, value4:{label:'V4',kind:'num'}, value5:{label:'V5',kind:'num'},
+    antiFlag:{label:'Anti flags',kind:'flags',options:Component.ANTI,span:2}, flag:{label:'Flags',kind:'flags',options:Component.FLAGS,span:2}, wear:{label:'Wear slot',kind:'enum',options:Component.WEAR}, immune:{label:'Immune',kind:'text'},
+    specular:{label:'Specular',kind:'num'}, socket:{label:'Sockets',kind:'num'}, attuAddon:{label:'Attu addon',kind:'num'}
+  };
+
+  static GROUPS = [
+    {title:'Identity', keys:['vnum','type','subType','size','nameK','locale']},
+    {title:'Economy', keys:['gold','shopBuy','refine','refineSet','magicPct']},
+    {title:'Requirements', keys:['limitType0','limitValue0','limitType1','limitValue1']},
+    {title:'Bonuses', keys:['addonType0','addonValue0','addonType1','addonValue1','addonType2','addonValue2']},
+    {title:'Values (type-specific)', keys:['value0','value1','value2','value3','value4','value5']},
+    {title:'Flags & Wear', keys:['antiFlag','flag','wear','immune']},
+    {title:'Misc', keys:['specular','socket','attuAddon']}
+  ];
+
+  state = { rows: Component.SAMPLE.map(o=>({...Component.DEFAULTS,...o})), locale:'en', nameCp:'1252', search:'', typeFilter:'ALL', onlyMissing:false, editingVnum:null, exportMsg:'', dirty:false, wide:false };
+
+  componentWillUnmount(){ if(this._ro) this._ro.disconnect(); }
+  _measure(el){ if(el && el!==this._root){ this._root=el; if(this._ro) this._ro.disconnect(); this._ro=new ResizeObserver(es=>{ const w=es[0].contentRect.width; const wide=w>=800; if(wide!==this.state.wide) this.setState({wide}); }); this._ro.observe(el); } }
+
+  cp(){ const l = Component.LOCALES.find(x=>x[0]===this.state.locale); return l?l[2]:'1252'; }
+  encChar(ch, cp){ const c=ch.codePointAt(0); if(c<128) return true; if(cp==='949'){ return (c>=0xAC00&&c<=0xD7A3)||(c>=0x1100&&c<=0x11FF)||(c>=0x3130&&c<=0x318F)||(c>=0x4E00&&c<=0x9FFF)||(c>=0x3000&&c<=0x303F)||(c>=0xFF00&&c<=0xFFEF); } if(cp==='1256'){ return (c>=0x0600&&c<=0x06FF)||(c>=0x0750&&c<=0x077F)||'€ŒœŸ‚ƒ„…†‡ˆ‰‹›™•–—°±«»¤£¥§©®¬´µ¶·¸¹º'.indexOf(ch)>=0; } const set=Component.EXTRA[cp]; return set? set.indexOf(ch)>=0 : false; }
+  encStr(s, cp){ if(!s) return true; if(cp==='utf8') return true; for(const ch of String(s)){ if(!this.encChar(ch,cp)) return false; } return true; }
+  cpDisplay(cp){ return cp==='utf8' ? 'UTF-8' : 'CP'+cp; }
+
+  decodeName(bytes, cp){ if(!bytes||!bytes.length) return ''; const map={'949':'euc-kr','1252':'windows-1252','1250':'windows-1250','1253':'windows-1253','1254':'windows-1254','1256':'windows-1256','utf8':'utf-8'}; try{ return new TextDecoder(map[cp]||'windows-1252').decode(new Uint8Array(bytes)); }catch(e){ return String.fromCharCode(...bytes); } }
+  nameOf(r){ return r.nameK!=null ? r.nameK : this.decodeName(r.bytes, this.state.nameCp); }
+  localeOf(r){ return r.locale!=null ? r.locale : this.decodeName(r.localeBytes, this.cp()); }
+  isMissing(r){ const l=this.localeOf(r); return !l || !l.trim(); }
+
+  onLoadProto(e){ const file=e.target.files&&e.target.files[0]; if(!file) return; const rd=new FileReader(); rd.onload=()=>this.parseProto(new Uint8Array(rd.result), file.name); rd.readAsArrayBuffer(file); e.target.value=''; }
+  onLoadNames(e){ const file=e.target.files&&e.target.files[0]; if(!file) return; const rd=new FileReader(); rd.onload=()=>this.parseNames(new Uint8Array(rd.result), file.name); rd.readAsArrayBuffer(file); e.target.value=''; }
+  _splitLine(buf,start,end){ const fields=[]; let fs=start; for(let k=start;k<=end;k++){ if(k===end||buf[k]===9){ let fe=k; if(fe>fs && buf[fe-1]===13) fe--; fields.push([fs,fe]); fs=k+1; } } return fields; }
+  _ascii(buf,a,b){ let s=''; for(let k=a;k<b;k++) s+=String.fromCharCode(buf[k]); return s.trim(); }
+  parseProto(buf, fname){ const rows=[]; let start=0, ln=0; for(let i=0;i<=buf.length;i++){ if(i===buf.length||buf[i]===10){ if(i>start+1||(i>start&&buf[start]!==13)){ if(ln>0){ const fl=this._splitLine(buf,start,i); if(fl.length>1 && (fl[0][1]>fl[0][0])){ const row={...Component.DEFAULTS}; row.vnum=this._ascii(buf,fl[0][0],fl[0][1]); const nb=[]; for(let k=fl[1][0];k<fl[1][1];k++) nb.push(buf[k]); row.bytes=nb.length?nb:null; row.nameK=null; for(let ci=2; ci<Component.COLS.length && ci<fl.length; ci++){ row[Component.COLS[ci]]=this._ascii(buf,fl[ci][0],fl[ci][1]); } if(row.vnum) rows.push(row); } } ln++; } start=i+1; } } if(!rows.length){ this.toast('No rows parsed — is this an item_proto.txt?'); return; } this._applyNames(rows); this.setState({rows, dirty:false, editingVnum:null, search:''}); this.toast('Loaded '+rows.length+' items from '+fname); }
+  parseNames(buf, fname){ const map={}; let start=0, ln=0, n=0; for(let i=0;i<=buf.length;i++){ if(i===buf.length||buf[i]===10){ if(i>start){ if(ln>0){ const fl=this._splitLine(buf,start,i); if(fl.length>=2){ const vn=this._ascii(buf,fl[0][0],fl[0][1]); const lb=[]; for(let k=fl[1][0];k<fl[1][1];k++) lb.push(buf[k]); if(vn){ map[vn]=lb; n++; } } } ln++; } start=i+1; } } this._namesMap=map; this.setState(s=>({ rows: s.rows.map(r=> map[r.vnum]!=null ? {...r, localeBytes:map[r.vnum], locale:null} : r) })); this.toast('Loaded '+n+' locale names from '+fname); }
+  _applyNames(rows){ const map=this._namesMap; if(!map) return; rows.forEach(r=>{ if(map[r.vnum]!=null){ r.localeBytes=map[r.vnum]; r.locale=null; } }); }
+  loadSample(){ this._namesMap=null; this.setState({ rows: Component.SAMPLE.map(o=>({...Component.DEFAULTS,...o})), dirty:false, editingVnum:null, search:'' }); this.toast('Restored sample data'); }
+
+  filtered(){ const {rows,search,typeFilter,onlyMissing}=this.state; const q=search.trim().toLowerCase(); const range=q.match(/^(\d+)\s*-\s*(\d+)$/); return rows.filter(r=>{ if(typeFilter!=='ALL' && r.type!==typeFilter) return false; if(onlyMissing && !this.isMissing(r)) return false; if(!q) return true; if(range){ const n=parseInt(r.vnum,10); return n>=+range[1] && n<=+range[2]; } return r.vnum.toLowerCase().includes(q) || this.nameOf(r).toLowerCase().includes(q) || this.localeOf(r).toLowerCase().includes(q); }); }
+
+  update(vnum,key,val){ this.setState(s=>({ dirty:true, editingVnum: (key==='vnum'&&s.editingVnum===vnum)?val:s.editingVnum, rows: s.rows.map(r=>{ if(r.vnum!==vnum) return r; const nr={...r,[key]:val}; if(key==='nameK') nr.bytes=null; if(key==='locale') nr.localeBytes=null; return nr; }) })); }
+  toggleFlag(vnum,key,opt){ this.setState(s=>({ dirty:true, rows:s.rows.map(r=>{ if(r.vnum!==vnum) return r; const cur=new Set(String(r[key]||'').split('|').map(x=>x.trim()).filter(Boolean)); cur.has(opt)?cur.delete(opt):cur.add(opt); const ordered=(Component.FIELD[key].options||[]).filter(o=>cur.has(o)); return {...r,[key]:ordered.join(' | ')}; }) })); }
+  nextVnum(){ const m=this.state.rows.reduce((a,r)=>Math.max(a, parseInt(r.vnum,10)||0),0); return String(m+1); }
+  add(){ const v=this.nextVnum(); this.setState(s=>({ dirty:true, editingVnum:v, rows:[{...Component.DEFAULTS,vnum:v,type:'ITEM_WEAPON'}, ...s.rows] })); }
+  clone(){ const src=this.state.rows.find(r=>r.vnum===this.state.editingVnum); if(!src) return; const v=this.nextVnum(); const i=this.state.rows.indexOf(src); this.setState(s=>{ const rows=s.rows.slice(); rows.splice(i+1,0,{...src,vnum:v}); return {dirty:true,editingVnum:v,rows}; }); }
+  del(){ const v=this.state.editingVnum; this.setState(s=>({dirty:true,editingVnum:null,rows:s.rows.filter(r=>r.vnum!==v)})); }
+  toast(msg){ this.setState({exportMsg:msg}); clearTimeout(this._tt); this._tt=setTimeout(()=>this.setState({exportMsg:''}),3600); }
+
+  _encField(str, cp, tally){ const o=[]; for(const ch of String(str)){ const c=ch.codePointAt(0); if(c<128){ o.push(c); } else if(c<256){ o.push(c); } else { tally.bad++; for(const b of new TextEncoder().encode(ch)) o.push(b); } } return o; }
+  export(){ const cp=this.cp(); const nameCp=this.state.nameCp; const tally={bad:0}; const rows=this.state.rows; const TAB=9,NL=10;
+    const proto=[]; const p=a=>{ for(const b of a) proto.push(b); };
+    p(this._encField(Component.HEADERS.join('\t'), cp, tally));
+    rows.forEach(r=>{ p([NL]); Component.COLS.forEach((k,ci)=>{ if(ci>0) p([TAB]); if(k==='nameK'){ if(r.nameK==null && r.bytes){ p(r.bytes); } else { p(this._encField(this.nameOf(r), nameCp, tally)); } } else { p(this._encField(String(r[k]??''), cp, tally)); } }); });
+    const nm=[]; const n=a=>{ for(const b of a) nm.push(b); };
+    n(this._encField('VNUM\tLOCALE_NAME', cp, tally));
+    rows.forEach(r=>{ const hasLoc = r.locale!=null ? (r.locale.trim()!=='') : (r.localeBytes && r.localeBytes.length); if(hasLoc){ n([NL]); n(this._encField(r.vnum, cp, tally)); n([TAB]); if(r.locale==null && r.localeBytes){ n(r.localeBytes); } else { n(this._encField(r.locale, cp, tally)); } } });
+    const dl=(name,arr)=>{ const b=new Blob([new Uint8Array(arr)],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); };
+    dl('item_proto.txt', proto); dl('item_names.txt', nm);
+    this.toast(tally.bad? ('Exported — '+tally.bad+' edited char(s) outside 1 byte, written as UTF-8') : ('Exported '+rows.length+' rows · original bytes preserved, ASCII intact')); }
+
+  short(type){ return (type||'').replace('ITEM_','').replace('WEAPON_',''); }
+  typeColor(type){ return ({ITEM_WEAPON:'#e0574f',ITEM_ARMOR:'#4a90d9',ITEM_USE:'#3fb27f',ITEM_QUEST:'#9aa0a6',ITEM_PET:'#a679d6',ITEM_UNIQUE:'#d4af37',ITEM_SPECIAL:'#e08a3c',ITEM_MATERIAL:'#8a7d63'})[type] || '#8a8f98'; }
+  fmtGold(g){ const n=parseInt(g,10)||0; if(n>=1000000) return (n/1000000).toFixed(n%1000000?1:0)+'M'; if(n>=1000) return (n/1000).toFixed(n%1000?1:0)+'k'; return String(n); }
+
+  THEME(theme, accent, wide){
+    const A = accent || ({ide:'#3fb950',grid:'#0969da',fantasy:'#d4af37'})[theme];
+    const mono='ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+    const sys='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    if(theme==='ide'){
+      const bg='#0d1117', panel='#161b22', panel2='#0d1117', bd='#30363d', tx='#c9d1d9', dim='#8b949e';
+      return this._pack({theme,A,mono,sys,bg,panel,panel2,bd,tx,dim, font:mono, nameFont:mono, rad:6, listVariant:'rows', gutter:true, rarity:false, titleText:'item_proto · editor', zebra:false, wide});
+    }
+    if(theme==='fantasy'){
+      const bg='#14110b', panel='#1d1810', panel2='#181309', bd='#3a3122', tx='#ece0c4', dim='#9d9075';
+      return this._pack({theme,A,mono,sys,bg,panel,panel2,bd,tx,dim, font:sys, nameFont:'Georgia, "Times New Roman", serif', rad:3, listVariant:'cards', gutter:false, rarity:true, titleText:'Item Archive', zebra:false, wide});
+    }
+    const bg='#eef1f5', panel='#ffffff', panel2='#f6f8fa', bd='#d5dbe2', tx='#1f2328', dim='#59636e';
+    return this._pack({theme,A,mono,sys,bg,panel,panel2,bd,tx,dim, font:sys, nameFont:sys, rad:8, listVariant:'table', gutter:false, rarity:false, titleText:'item_proto grid', zebra:true, wide});
+  }
+  _pack(c){
+    const {A,mono,sys,bg,panel,panel2,bd,tx,dim,font,nameFont,rad}=c; const wide=c.wide;
+    const ctrlBase={width:'100%',padding:'8px 10px',borderRadius:rad+'px',border:'1px solid '+bd,background:panel2,color:tx,font:'500 12px '+sys,outline:'none'};
+    const btn={padding:'8px 12px',borderRadius:rad+'px',border:'1px solid '+bd,cursor:'pointer',font:'600 12px '+sys,whiteSpace:'nowrap'};
+    return {
+      _flags:c, isTable:c.listVariant==='table', showGutter:c.gutter,
+      page: wide
+        ? {display:'flex',flexDirection:'row',height:'100%',minHeight:'560px',background:bg,color:tx,fontFamily:sys,position:'relative',overflow:'hidden',borderRadius:'2px'}
+        : {display:'flex',flexDirection:'column',height:'100%',minHeight:'640px',background:bg,color:tx,fontFamily:sys,position:'relative',overflow:'hidden',borderRadius:'2px'},
+      leftCol: wide
+        ? {display:'flex',flexDirection:'column',height:'100%',width:'clamp(400px, 36%, 520px)',flexShrink:'0',minWidth:'0',borderRight:'1px solid '+bd}
+        : {display:'flex',flexDirection:'column',flex:'1',minHeight:'0',height:'100%'},
+      panel: wide
+        ? {display:'flex',flexDirection:'column',flex:'1',minWidth:'0',height:'100%',background:panel}
+        : {position:'absolute',top:'0',right:'0',bottom:'0',width:'88%',maxWidth:'400px',background:panel,borderLeft:'1px solid '+bd,display:'flex',flexDirection:'column',zIndex:'10',boxShadow:'-8px 0 32px rgba(0,0,0,.35)'},
+      panelEmpty:{flex:'1',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'12px',padding:'40px',textAlign:'center',font:'500 13px '+sys,color:dim,lineHeight:'1.6',maxWidth:'340px',margin:'0 auto'},
+      panelEmptyIcon:{font:'300 46px '+mono,color:this._alpha(A,.5)},
+      head:{padding:'14px 16px 10px',borderBottom:'1px solid '+bd,background:panel},
+      headTop:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'},
+      title:{font:'700 15px '+(c.theme==='fantasy'?nameFont:font),letterSpacing:c.theme==='ide'?'0.5px':'0',color:tx},
+      titleText:c.titleText,
+      cpBadge:{font:'700 10px '+mono,color:A,background:this._alpha(A,.14),border:'1px solid '+this._alpha(A,.4),padding:'3px 7px',borderRadius:'20px',whiteSpace:'nowrap'},
+      headSub:{font:'400 11px '+mono,color:dim,marginTop:'3px'},
+      toolbar:{display:'flex',flexDirection:'column',gap:'8px',padding:'12px 16px',borderBottom:'1px solid '+bd,background:panel},
+      ioRow:{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'},
+      ioSpacer:{flex:'1',minWidth:'0'},
+      hiddenFile:{position:'absolute',width:'1px',height:'1px',opacity:'0',pointerEvents:'none'},
+      loadBtn:{...btn,display:'inline-flex',alignItems:'center',background:panel2,color:tx,border:'1px solid '+bd},
+      ghostBtn:{...btn,background:'transparent',color:dim,border:'1px dashed '+bd},
+      exportBtnTop:{...btn,background:A,color:c.theme==='fantasy'?'#1a140a':(c.theme==='grid'?'#fff':'#0d1117'),border:'1px solid '+A},
+      ctrlRow:{display:'flex',flexDirection:'column',gap:'4px'},
+      ctrlRow2:{display:'flex',gap:'8px',alignItems:'stretch'},
+      ctrlLabel:{font:'600 10px '+sys,textTransform:'uppercase',letterSpacing:'.6px',color:dim},
+      select:{...ctrlBase,flex:'1',minWidth:'0'},
+      selectSm:{...ctrlBase,flex:'1',padding:'8px'},
+      dualLabel:{display:'flex',justifyContent:'space-between',gap:'8px'},
+      dualCtrl:{display:'flex',gap:'8px',alignItems:'stretch'},
+      searchInput:{...ctrlBase},
+      addBtn:{...btn,background:A,color:c.theme==='fantasy'?'#1a140a':(c.theme==='grid'?'#fff':'#0d1117'),border:'1px solid '+A},
+      legend:{display:'flex',gap:'14px',padding:'8px 16px',borderBottom:'1px solid '+bd,background:panel2,flexWrap:'wrap'},
+      legendItem:{display:'flex',alignItems:'center',gap:'5px',font:'500 10px '+sys,color:dim},
+      legendDotSafe:{width:'8px',height:'8px',borderRadius:'50%',background:'#3fb27f',display:'inline-block'},
+      legendDotWarn:{color:'#e0a030',fontSize:'11px'},
+      listWrap:{flex:'1',overflowY:'auto',padding:c.listVariant==='cards'?'10px 12px':'0',background:bg},
+      headerRow:{display:'grid',gridTemplateColumns:'62px 1fr 68px 58px',gap:'8px',padding:'8px 16px',position:'sticky',top:'0',background:panel2,borderBottom:'1px solid '+bd,font:'700 9.5px '+sys,letterSpacing:'.5px',color:dim,zIndex:'1'},
+      thVnum:{}, thName:{}, thType:{textAlign:'center'}, thGold:{textAlign:'right'},
+      gutter:{font:'400 10px '+mono,color:this._alpha(dim,.7),minWidth:'22px',textAlign:'right'},
+      vnum:{font:'600 12px '+mono,color:c.theme==='grid'?tx:A,minWidth:'46px'},
+      nameCell:{flex:'1',minWidth:'0',display:'flex',flexDirection:'column',gap:'1px'},
+      nameLine:{display:'flex',alignItems:'center',gap:'5px'},
+      warnDot:{color:'#e0a030',fontSize:'11px',flexShrink:'0'},
+      warnDotSm:{color:'#c98a2a',fontSize:'9px',flexShrink:'0',opacity:'.8'},
+      gold:{font:'600 11px '+mono,color:c.theme==='fantasy'?A:dim,textAlign:'right',minWidth:'44px'},
+      footer:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 16px',borderTop:'1px solid '+bd,background:panel,gap:'8px'},
+      count:{font:'500 11px '+mono,color:dim},
+      exportBtn:{...btn,background:A,color:c.theme==='fantasy'?'#1a140a':(c.theme==='grid'?'#fff':'#0d1117'),border:'1px solid '+A},
+      emptyState:{padding:'40px 16px',textAlign:'center',font:'500 12px '+sys,color:dim},
+      toast:{position:'absolute',left:'12px',right:'12px',bottom:'66px',padding:'10px 12px',borderRadius:rad+'px',background:c.theme==='grid'?'#1f2328':'#000',color:'#fff',font:'500 11px '+sys,textAlign:'center',boxShadow:'0 6px 24px rgba(0,0,0,.4)',zIndex:'6'},
+      overlay:{position:'absolute',inset:'0',background:'rgba(0,0,0,.5)',zIndex:'9'},
+      drawer:{position:'absolute',top:'0',right:'0',bottom:'0',width:'86%',maxWidth:'380px',background:panel,borderLeft:'1px solid '+bd,display:'flex',flexDirection:'column',zIndex:'10',boxShadow:'-8px 0 32px rgba(0,0,0,.35)'},
+      drawerHead:{display:'flex',alignItems:'flex-start',justifyContent:'space-between',padding:'14px 16px',borderBottom:'1px solid '+bd,gap:'8px'},
+      drawerVnum:{font:'700 11px '+mono,color:A},
+      drawerName:{font:'600 15px '+nameFont,color:tx,marginTop:'2px',wordBreak:'break-word'},
+      closeBtn:{...btn,padding:'4px 9px',background:'transparent',color:dim,border:'1px solid '+bd},
+      drawerBody:{flex:'1',overflowY:'auto',padding:'12px 16px'},
+      groupTitle:{font:'700 10px '+sys,textTransform:'uppercase',letterSpacing:'.7px',color:A,margin:'14px 0 8px',paddingBottom:'4px',borderBottom:'1px solid '+this._alpha(bd,.7)},
+      fieldGrid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'9px'},
+      chipWrap:{display:'flex',flexWrap:'wrap',gap:'6px'},
+      fieldLabelRow:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'4px',marginBottom:'3px'},
+      fieldLabel:{font:'600 10px '+sys,color:dim},
+      fieldWarn:{font:'600 9px '+sys,color:'#e0a030',whiteSpace:'nowrap'},
+      input:{...ctrlBase,padding:'7px 9px',font:'500 12px '+mono},
+      delBtn:{...btn,background:'transparent',color:'#e0574f',border:'1px solid '+this._alpha('#e0574f',.5)},
+      cloneBtn:{...btn,background:'transparent',color:tx,border:'1px solid '+bd},
+      doneBtn:{...btn,flex:'1',background:A,color:c.theme==='fantasy'?'#1a140a':(c.theme==='grid'?'#fff':'#0d1117'),border:'1px solid '+A},
+      drawerFoot:{display:'flex',gap:'8px',padding:'12px 16px',borderTop:'1px solid '+bd,background:panel2}
+    };
+  }
+  _alpha(hex,a){ const h=hex.replace('#',''); const n=parseInt(h.length===3?h.split('').map(x=>x+x).join(''):h,16); return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+
+  rowStyle(t, r, idx){
+    const f=t._flags, cp=this.cp(); const acc=this.typeColor(r.type);
+    if(f.listVariant==='cards'){
+      return {display:'flex',alignItems:'center',gap:'10px',padding:'11px 12px 11px 14px',marginBottom:'8px',background:f.panel,border:'1px solid '+f.bd,borderLeft:'3px solid '+acc,borderRadius:f.rad+'px',cursor:'pointer'};
+    }
+    if(f.listVariant==='table'){
+      return {display:'grid',gridTemplateColumns:'62px 1fr 68px 58px',gap:'8px',alignItems:'center',padding:'9px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.7),background: idx%2? f.panel2 : f.panel,cursor:'pointer'};
+    }
+    return {display:'flex',alignItems:'center',gap:'10px',padding:'8px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.55),cursor:'pointer',background: 'transparent'};
+  }
+
+  renderVals(){
+    const theme=this.props.theme||'grid';
+    const wide = this.props.desktop!=null ? !!this.props.desktop : this.state.wide;
+    const t=this.THEME(theme, this.props.accent, wide);
+    const cp=this.cp(); const nameCp=this.state.nameCp; const cpLabel=this.cpDisplay(cp); const f=t._flags;
+    const mw = f.listVariant==='table'?'200px':'160px';
+    const rows=this.filtered();
+    const visibleRows=rows.map((r,i)=>{
+      const acc=this.typeColor(r.type);
+      const badgeStyle={font:'700 9.5px '+t._flags.mono,color:acc,background:this._alpha(acc,.15),border:'1px solid '+this._alpha(acc,.4),padding:'3px 7px',borderRadius:'5px',textAlign:'center',justifySelf: f.listVariant==='table'?'center':'auto',whiteSpace:'nowrap'};
+      const missing=this.isMissing(r); const localeStr=this.localeOf(r);
+      return {
+        vnum:r.vnum, idx:String(i+1).padStart(2,'0'),
+        primary: missing? '⌀ untranslated' : localeStr,
+        primaryWarn: !missing && r.locale!=null && !this.encStr(r.locale,cp),
+        primaryStyle:{font:'600 13px '+f.nameFont,color: missing? '#e0a030' : f.tx,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:mw},
+        secondary: this.nameOf(r) || '—',
+        secondaryWarn: r.nameK!=null && !this.encStr(r.nameK,nameCp),
+        secondaryStyle:{font:'400 11px '+f.mono,color:f.dim,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:mw},
+        typeShort:this.short(r.type), badgeStyle,
+        goldLabel:this.fmtGold(r.gold),
+        style:this.rowStyle(t,r,i),
+        onClick:()=>this.setState({editingVnum:r.vnum})
+      };
+    });
+    const editRow=this.state.editingVnum!=null? this.state.rows.find(r=>r.vnum===this.state.editingVnum):null;
+    const inputStyle=t.input; const A=t._flags.A;
+    const chip=(on)=>({font:'600 10px '+f.mono,padding:'5px 9px',borderRadius:f.rad+'px',cursor:'pointer',whiteSpace:'nowrap',border:'1px solid '+(on?A:f.bd),background:on?this._alpha(A,.16):f.panel2,color:on?A:f.dim});
+    const editGroups= editRow? Component.GROUPS.map(g=>({ title:g.title, fields:g.keys.map(k=>{
+      const meta=Component.FIELD[k]||{label:k,kind:'text'};
+      const isEnum=meta.kind==='enum', isFlags=meta.kind==='flags';
+      if(isFlags){
+        const cur=new Set(String(editRow[k]||'').split('|').map(x=>x.trim()).filter(Boolean));
+        const chips=(meta.options||[]).map(opt=>({ label:opt.replace(/^ANTI_|^ITEM_/,''), title:opt, on:cur.has(opt), style:chip(cur.has(opt)), onToggle:()=>this.toggleFlag(editRow.vnum,k,opt) }));
+        return { key:k, label:meta.label+' · '+cur.size, isEnum:false, isText:false, isFlags:true, chips, wrapStyle:{gridColumn:'1 / -1'} };
+      }
+      const value = k==='nameK' ? this.nameOf(editRow) : (k==='locale' ? this.localeOf(editRow) : String(editRow[k]??''));
+      let options=meta.options||[];
+      if(isEnum && options.indexOf(value)<0 && value) options=[value,...options];
+      const fcp = (k==='nameK') ? nameCp : cp;
+      const isByteBacked = (k==='nameK' && editRow.nameK==null) || (k==='locale' && editRow.locale==null);
+      const warn=(meta.kind==='text' || k==='nameK') && value!=='' && !this.encStr(value,fcp) && !isByteBacked;
+      return { key:k, label:meta.label, value, isEnum, isText:!isEnum, isFlags:false, options, warn, warnCp:this.cpDisplay(fcp),
+        inputMode: meta.kind==='num'?'numeric':'text',
+        inputStyle: warn? {...inputStyle,border:'1px solid #e0a030',background:this._alpha('#e0a030',.08)} : inputStyle,
+        wrapStyle:{gridColumn: (meta.span===2?'1 / -1':'auto')},
+        onInput:(e)=>this.update(editRow.vnum,k,e.target.value) };
+    })})):[];
+
+    return {
+      t, cpLabel, isTable:t.isTable, showGutter:t.showGutter,
+      locale:this.state.locale, onLocale:(e)=>this.setState({locale:e.target.value}),
+      localeOpts:Component.LOCALES.map(l=>({code:l[0],label:l[1]})),
+      onNameCp:()=>this.setState(s=>({nameCp: s.nameCp==='949'?'1252':'949'})),
+      onLoadProto:(e)=>this.onLoadProto(e), onLoadNames:(e)=>this.onLoadNames(e), onSample:()=>this.loadSample(),
+      nameCpLabel: nameCp==='949'?'CP949':'CP1252',
+      nameCpBtnStyle:{padding:'8px 10px',borderRadius:f.rad+'px',cursor:'pointer',font:'700 11px '+f.mono,whiteSpace:'nowrap',border:'1px solid '+f.bd,background:f.panel2,color:f.dim,minWidth:'66px'},
+      search:this.state.search, onSearch:(e)=>this.setState({search:e.target.value}),
+      typeFilter:this.state.typeFilter, onType:(e)=>this.setState({typeFilter:e.target.value}),
+      typeOpts:['ALL',...Array.from(new Set(this.state.rows.map(r=>r.type)))],
+      onToggleMissing:()=>this.setState(s=>({onlyMissing:!s.onlyMissing})),
+      missingBtnStyle:{padding:'8px 10px',borderRadius:f.rad+'px',cursor:'pointer',font:'600 11px '+f.sys,whiteSpace:'nowrap',border:'1px solid '+(this.state.onlyMissing?'#e0a030':f.bd),background:this.state.onlyMissing?this._alpha('#e0a030',.15):f.panel2,color:this.state.onlyMissing?'#e0a030':f.dim},
+      onAdd:()=>this.add(),
+      visibleRows, empty:visibleRows.length===0,
+      shownCount:visibleRows.length, totalCount:this.state.rows.length,
+      dirtyLabel:this.state.dirty?' · edited':'',
+      onExport:()=>this.export(), exportMsg:this.state.exportMsg,
+      setRoot:(el)=>this._measure(el),
+      wide, showPanel: wide || !!editRow, showOverlay: !wide && !!editRow, panelEmpty: wide && !editRow, closeLabel: wide ? '✕ Close' : '✕',
+      editing:!!editRow, editVnum:editRow?editRow.vnum:'', editName:editRow?(this.localeOf(editRow)||this.nameOf(editRow)||'New item'):'',
+      editGroups, onClose:()=>this.setState({editingVnum:null}), onDelete:()=>this.del(), onClone:()=>this.clone()
+    };
+  }
+}
+</script>
+</body>
+</html>
