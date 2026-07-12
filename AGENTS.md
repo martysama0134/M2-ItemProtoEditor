@@ -12,6 +12,7 @@ Hard invariants:
 2. **`COLS` and `HEADERS` must stay index-aligned.** A new field also needs
    `DEFAULTS`, `FIELD`, and a `GROUPS` entry — five places total (see
    README § Add a proto column). New columns only at index ≥ 2; columns 0–1
-   (`vnum`, `nameK`) are special-cased in parse/export.
+   (`vnum`, `nameK`) are read by fixed position in the parser, and `nameK`
+   is raw-byte special-cased in export.
 3. **No build step.** Verify changes by opening `index.html` in a browser and
    clicking **Sample**, then Export and inspect the output columns.

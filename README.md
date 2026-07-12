@@ -1,8 +1,9 @@
 # M2 Item Proto Editor
 
-A single-file browser editor for Metin2 `item_proto.txt` and `item_names.txt`.
-No build step, no server, no dependencies — open `index.html` in a browser and
-you are running it.
+A browser editor for Metin2 `item_proto.txt` and `item_names.txt`.
+No build step, no server — open `index.html` in a browser and you are running
+it (all app source is in that one file; the first load fetches React from a
+CDN, so it needs internet once).
 
 - [Using the editor](#using-the-editor)
 - [File format](#file-format)
@@ -17,7 +18,8 @@ you are running it.
 - **↑ Load proto** — load an `item_proto.txt` (tab-separated text format, first
   line is the header row).
 - **↑ Load names** — load an `item_names.txt` (`VNUM<TAB>LOCALE_NAME`, first
-  line header). Names are matched to proto rows by vnum.
+  line header). Names are matched to proto rows by vnum. Re-loading overlays
+  matching vnums; it does not clear names for vnums missing from the new file.
 - **Sample** — restore the built-in demo items (useful for testing changes to
   the editor itself).
 
@@ -39,17 +41,25 @@ you are running it.
 Metin2 protos are legacy single-byte/EUC-KR encoded, so the editor works at
 the byte level:
 
-- **LOCALE_NAME charset** selects the codepage used to decode/encode
-  `item_names.txt` and the proto's ASCII columns (CP1250/1252/1253/1254/1256,
-  or UTF-8 = anything goes).
-- **NAME(K)** is the throwaway Korean source-name column; its charset toggles
-  independently between CP949 and CP1252.
+- **LOCALE_NAME charset** selects the codepage used to *decode* loaded
+  `item_names.txt` bytes and to drive the ⚠ encodability warnings
+  (CP1250/1252/1253/1254/1256, or UTF-8 = never warn). It does **not**
+  re-encode text on export — see the caveat below.
+- **NAME(K)** is the throwaway Korean source-name column; its decode/warning
+  charset toggles independently between CP949 and CP1252.
 - **Byte preservation:** a name you never edit is exported with its *original
-  bytes*, untouched — loading and re-exporting a file does not re-encode or
-  corrupt anything. Only rows whose name you actually edited are re-encoded.
+  bytes*, untouched. Only rows whose name you actually edited are re-encoded.
+  (This covers the name payload bytes — the files themselves are still
+  rebuilt: header regenerated, LF line endings, fields trimmed, columns
+  beyond the known set dropped, names without a matching proto row omitted.)
 - A **⚠** marker means the current text contains characters not encodable in
-  the selected codepage; they will be written as UTF-8 bytes on export (and
-  counted in the export toast).
+  the selected codepage.
+- **Export encoding caveat:** edited text is written byte-wise as
+  ASCII → 1 byte, U+0080–U+00FF → the raw low byte (correct for CP1252
+  accents, *not* re-mapped for other codepages), U+0100 and above → UTF-8
+  bytes (counted in the export toast). There is no real CP949/CP1250/…
+  encoder — for those codepages keep edited names ASCII, or rely on byte
+  preservation and fix non-ASCII names outside the editor.
 
 ### Exporting
 
@@ -86,8 +96,9 @@ and `item_names.txt` (only rows that have a LOCALE_NAME).
 
 `item_names.txt` is `VNUM<TAB>LOCALE_NAME` with a header line.
 
-Flag columns hold `|`-separated names (`ANTI_DROP | ANTI_SELL`). All values
-are kept as strings internally.
+Flag columns hold `|`-separated names (`ANTI_DROP | ANTI_SELL`). Scalar
+values are kept as strings internally; unedited names are kept as byte arrays
+(`bytes` / `localeBytes`) with `nameK`/`locale` set to `null`.
 
 ## Modifying the editor
 
@@ -126,13 +137,15 @@ All schema knowledge lives in static tables on `Component` in `index.html`:
 | `EXTRA` | Per-codepage string of encodable non-ASCII characters |
 | `SAMPLE` | Built-in demo rows (they inherit `DEFAULTS` for missing keys) |
 
-Field kinds in `FIELD`:
+Field metadata in `FIELD` — `kind` is one of:
 
 - `num` — text input with numeric input mode
 - `text` — plain text input
 - `enum` — dropdown; needs `options: Component.SOMETABLE`
 - `flags` — toggle chips joined as `A | B | C`; needs `options`
-- `span: 2` — field takes the full panel width
+
+Other keys: `label` is the panel caption; `span: 2` makes the field take the
+full panel width.
 
 ### Add a proto column (new field)
 
@@ -151,17 +164,21 @@ Example — add a trailing `MASK_VNUM` column:
 
 Notes:
 
-- Columns 0 (`vnum`) and 1 (`nameK`) are special-cased in `parseProto()` and
-  `export()` (nameK is raw bytes). Insert new columns only at index ≥ 2.
-- Files with *fewer* columns than `COLS` load fine — missing fields get
-  `DEFAULTS`. Export always writes every column in `COLS`.
+- Columns 0 (`vnum`) and 1 (`nameK`) are read by fixed position in
+  `parseProto()`, and `nameK` is special-cased (raw bytes) in `export()`.
+  Insert new columns only at index ≥ 2.
+- Rows with missing *trailing* columns load fine — those fields get
+  `DEFAULTS` (a row still needs a vnum plus at least one more field).
+  Interior columns cannot be omitted; tabs are positional. Export always
+  writes every column in `COLS`; extra input columns beyond it are dropped.
 - `SAMPLE` does not need updating; sample rows inherit `DEFAULTS`.
 
 ### Add an item type
 
-Append the name to `ITEMTYPES` (e.g. `'ITEM_AURA'`). It appears in the type
-dropdown and the type filter immediately. Optional: give it a list-badge color
-in `typeColor()`.
+Append the name to `ITEMTYPES` (e.g. `'ITEM_AURA'`). It appears in the
+edit-panel type dropdown immediately; the list's type filter only offers
+types present in the loaded rows. Optional: give it a list-badge color in
+`typeColor()`.
 
 ### Add an apply / bonus type
 
@@ -185,16 +202,25 @@ options array.
 3. Codepages whose repertoire can't be listed as a string (CJK etc.) get range
    logic in `encChar()` instead — see the CP949 and CP1256 branches there.
 
+These steps add decoding and ⚠ warnings for the new codepage. Export still
+writes low-byte/UTF-8 as described in the encoding caveat above — a true
+encoder for the codepage would also require changing `_encField()`.
+
 ### Gotchas
 
-- **Index alignment.** A `COLS`/`HEADERS` mismatch silently shifts every
-  exported column. Count twice.
+- **Index alignment.** A `COLS`/`HEADERS` mismatch mislabels that column and
+  every one after it in the exported header. Count twice — there are 33.
+- **Flag chips rebuild the value.** `toggleFlag()` regenerates the column from
+  the known options only — unknown/custom flag names (and the placeholder
+  `NONE` default) are silently dropped on the first toggle. Add custom flags
+  to the options array before using them.
 - **Byte-backed names.** `nameK` and `locale` keep original file bytes
   (`bytes` / `localeBytes`) until edited; editing sets the string and nulls
   the bytes for that row (see `update()`). Don't "normalize" this — it is the
   no-corruption guarantee.
-- **Everything is a string.** Row values are strings even for numeric fields;
-  comparisons/parsing use `parseInt` where needed.
+- **Scalars are strings.** Row values are strings even for numeric fields
+  (comparisons/parsing use `parseInt` where needed); byte-backed names are
+  `null` plus a byte array instead.
 - **Static init order.** `FIELD` references `Component.ITEMTYPES` etc. at
   class-init time — option arrays must be declared before `FIELD`.
 - **`support.js` is generated.** Repeat: never edit it.
@@ -206,3 +232,5 @@ options array.
 3. **Export** and inspect the downloaded files — header count, column count,
    and tab positions must match your server's expectations.
 4. Load a real `item_proto.txt`, spot-check a few rows, re-export, diff.
+5. For encoding-sensitive changes, hex-compare unedited non-ASCII names
+   across a load → export round trip (byte preservation must hold).
