@@ -69,7 +69,7 @@
     <span style="{{ t.legendItem }}"><span style="{{ t.legendDotWarn }}">⚠</span>not encodable in {{ cpLabel }}</span>
   </div>
 
-  <div style="{{ t.listWrap }}" class="ie-scroll">
+  <div style="{{ t.listWrap }}" class="ie-scroll" ref="{{ setList }}" onScroll="{{ onListScroll }}">
     <sc-if value="{{ isTable }}" hint-placeholder-val="{{ true }}">
       <div style="{{ t.headerRow }}">
         <span style="{{ t.thVnum }}">VNUM</span>
@@ -78,6 +78,7 @@
         <span style="{{ t.thGold }}">GOLD</span>
       </div>
     </sc-if>
+    <div style="{{ padTop }}" ref="{{ setPadTop }}"></div>
     <sc-for list="{{ visibleRows }}" as="row" hint-placeholder-count="6">
       <div style="{{ row.style }}" onClick="{{ row.onClick }}">
         <sc-if value="{{ showGutter }}" hint-placeholder-val="{{ true }}"><span style="{{ t.gutter }}">{{ row.idx }}</span></sc-if>
@@ -96,6 +97,7 @@
         <span style="{{ t.gold }}">{{ row.goldLabel }}</span>
       </div>
     </sc-for>
+    <div style="{{ padBottom }}" ref="{{ setPadBottom }}"></div>
     <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
       <div style="{{ t.emptyState }}">No items match this filter.</div>
     </sc-if>
@@ -234,17 +236,27 @@ class Component extends DCLogic {
     {title:'Misc', keys:['specular','socket','attuAddon']}
   ];
 
-  state = { rows: Component.SAMPLE.map(o=>({...Component.DEFAULTS,...o})), locale:'en', nameCp:'1252', search:'', typeFilter:'ALL', onlyMissing:false, editingVnum:null, exportMsg:'', dirty:false, wide:false };
+  state = { rows: Component.SAMPLE.map(o=>({...Component.DEFAULTS,...o})), locale:'en', nameCp:'1252', search:'', typeFilter:'ALL', onlyMissing:false, editingVnum:null, exportMsg:'', dirty:false, wide:false, scrollY:0 };
 
-  componentWillUnmount(){ if(this._ro) this._ro.disconnect(); }
+  componentDidMount(){ this._measureList(); }
+  componentDidUpdate(){ this._measureList(); }
+  componentWillUnmount(){ if(this._ro) this._ro.disconnect(); if(this._sRaf!=null) cancelAnimationFrame(this._sRaf); }
   _measure(el){ if(el && el!==this._root){ this._root=el; if(this._ro) this._ro.disconnect(); this._ro=new ResizeObserver(es=>{ const w=es[0].contentRect.width; const wide=w>=800; if(wide!==this.state.wide) this.setState({wide}); }); this._ro.observe(el); } }
+
+  // Windowed list rendering: only ~viewport+overscan rows exist in the DOM;
+  // spacer divs (padTop/padBottom) keep scrollbar geometry identical to a full render.
+  static OVERSCAN = 10;
+  static ROW_EST = { rows:50, table:52, cards:66 };
+  _estRowH(){ return (this._rowHs && this._rowHs[this._variant]) || Component.ROW_EST[this._variant] || 52; }
+  _onListScroll(){ if(this._sRaf!=null) return; this._sRaf=requestAnimationFrame(()=>{ this._sRaf=null; const el=this._list; if(!el) return; const start=Math.max(0, Math.floor(el.scrollTop/this._estRowH())-Component.OVERSCAN); if(Math.abs(start-(this._winStart||0))>=Component.OVERSCAN/2) this.setState({scrollY:el.scrollTop}); }); }
+  _measureList(){ const el=this._list; if(!el) return; let changed=false; const vh=el.clientHeight; if(Math.abs(vh-(this._listH||0))>1){ this._listH=vh; changed=true; } const pt=this._padT, pb=this._padB, n=this._sliceLen; if(pt && pb && n>0){ const h=(pb.offsetTop-pt.offsetTop-pt.offsetHeight)/n; if(!this._rowHs) this._rowHs={}; if(h>10 && Math.abs(h-(this._rowHs[this._variant]||0))>0.5){ this._rowHs[this._variant]=h; changed=true; } } if(changed) this.forceUpdate(); }
 
   cp(){ const l = Component.LOCALES.find(x=>x[0]===this.state.locale); return l?l[2]:'1252'; }
   encChar(ch, cp){ const c=ch.codePointAt(0); if(c<128) return true; if(cp==='949'){ return (c>=0xAC00&&c<=0xD7A3)||(c>=0x1100&&c<=0x11FF)||(c>=0x3130&&c<=0x318F)||(c>=0x4E00&&c<=0x9FFF)||(c>=0x3000&&c<=0x303F)||(c>=0xFF00&&c<=0xFFEF); } if(cp==='1256'){ return (c>=0x0600&&c<=0x06FF)||(c>=0x0750&&c<=0x077F)||'€ŒœŸ‚ƒ„…†‡ˆ‰‹›™•–—°±«»¤£¥§©®¬´µ¶·¸¹º'.indexOf(ch)>=0; } const set=Component.EXTRA[cp]; return set? set.indexOf(ch)>=0 : false; }
   encStr(s, cp){ if(!s) return true; if(cp==='utf8') return true; for(const ch of String(s)){ if(!this.encChar(ch,cp)) return false; } return true; }
   cpDisplay(cp){ return cp==='utf8' ? 'UTF-8' : 'CP'+cp; }
 
-  decodeName(bytes, cp){ if(!bytes||!bytes.length) return ''; const map={'949':'euc-kr','1252':'windows-1252','1250':'windows-1250','1253':'windows-1253','1254':'windows-1254','1256':'windows-1256','utf8':'utf-8'}; try{ return new TextDecoder(map[cp]||'windows-1252').decode(new Uint8Array(bytes)); }catch(e){ return String.fromCharCode(...bytes); } }
+  decodeName(bytes, cp){ if(!bytes||!bytes.length) return ''; const map={'949':'euc-kr','1252':'windows-1252','1250':'windows-1250','1253':'windows-1253','1254':'windows-1254','1256':'windows-1256','utf8':'utf-8'}; const enc=map[cp]||'windows-1252'; try{ const decs=Component._DECS||(Component._DECS={}); const d=decs[enc]||(decs[enc]=new TextDecoder(enc)); return d.decode(new Uint8Array(bytes)); }catch(e){ return String.fromCharCode(...bytes); } }
   nameOf(r){ return r.nameK!=null ? r.nameK : this.decodeName(r.bytes, this.state.nameCp); }
   localeOf(r){ return r.locale!=null ? r.locale : this.decodeName(r.localeBytes, this.cp()); }
   isMissing(r){ const l=this.localeOf(r); return !l || !l.trim(); }
@@ -258,7 +270,7 @@ class Component extends DCLogic {
   _applyNames(rows){ const map=this._namesMap; if(!map) return; rows.forEach(r=>{ if(map[r.vnum]!=null){ r.localeBytes=map[r.vnum]; r.locale=null; } }); }
   loadSample(){ this._namesMap=null; this.setState({ rows: Component.SAMPLE.map(o=>({...Component.DEFAULTS,...o})), dirty:false, editingVnum:null, search:'' }); this.toast('Restored sample data'); }
 
-  filtered(){ const {rows,search,typeFilter,onlyMissing}=this.state; const q=search.trim().toLowerCase(); const range=q.match(/^(\d+)\s*-\s*(\d+)$/); return rows.filter(r=>{ if(typeFilter!=='ALL' && r.type!==typeFilter) return false; if(onlyMissing && !this.isMissing(r)) return false; if(!q) return true; if(range){ const n=parseInt(r.vnum,10); return n>=+range[1] && n<=+range[2]; } return r.vnum.toLowerCase().includes(q) || this.nameOf(r).toLowerCase().includes(q) || this.localeOf(r).toLowerCase().includes(q); }); }
+  filtered(){ const {rows,search,typeFilter,onlyMissing,nameCp,locale}=this.state; const k=[rows,search,typeFilter,onlyMissing,nameCp,locale]; const c=this._fcache; if(c && c.k.every((v,i)=>v===k[i])) return c.v; const q=search.trim().toLowerCase(); const range=q.match(/^(\d+)\s*-\s*(\d+)$/); const v=rows.filter(r=>{ if(typeFilter!=='ALL' && r.type!==typeFilter) return false; if(onlyMissing && !this.isMissing(r)) return false; if(!q) return true; if(range){ const n=parseInt(r.vnum,10); return n>=+range[1] && n<=+range[2]; } return r.vnum.toLowerCase().includes(q) || this.nameOf(r).toLowerCase().includes(q) || this.localeOf(r).toLowerCase().includes(q); }); this._fcache={k,v}; return v; }
 
   update(vnum,key,val){ this.setState(s=>({ dirty:true, editingVnum: (key==='vnum'&&s.editingVnum===vnum)?val:s.editingVnum, rows: s.rows.map(r=>{ if(r.vnum!==vnum) return r; const nr={...r,[key]:val}; if(key==='nameK') nr.bytes=null; if(key==='locale') nr.localeBytes=null; return nr; }) })); }
   toggleFlag(vnum,key,opt){ this.setState(s=>({ dirty:true, rows:s.rows.map(r=>{ if(r.vnum!==vnum) return r; const cur=new Set(String(r[key]||'').split('|').map(x=>x.trim()).filter(Boolean)); cur.has(opt)?cur.delete(opt):cur.add(opt); const ordered=(Component.FIELD[key].options||[]).filter(o=>cur.has(o)); return {...r,[key]:ordered.join(' | ')}; }) })); }
@@ -342,7 +354,7 @@ class Component extends DCLogic {
       legendItem:{display:'flex',alignItems:'center',gap:'5px',font:'500 10px '+sys,color:dim},
       legendDotSafe:{width:'8px',height:'8px',borderRadius:'50%',background:'#3fb27f',display:'inline-block'},
       legendDotWarn:{color:'#e0a030',fontSize:'11px'},
-      listWrap:{flex:'1',overflowY:'auto',padding:c.listVariant==='cards'?'10px 12px':'0',background:bg},
+      listWrap:{flex:'1',overflowY:'auto',overflowAnchor:'none',padding:c.listVariant==='cards'?'10px 12px':'0',background:bg},
       headerRow:{display:'grid',gridTemplateColumns:'62px 1fr 68px 58px',gap:'8px',padding:'8px 16px',position:'sticky',top:'0',background:panel2,borderBottom:'1px solid '+bd,font:'700 9.5px '+sys,letterSpacing:'.5px',color:dim,zIndex:'1'},
       thVnum:{}, thName:{}, thType:{textAlign:'center'}, thGold:{textAlign:'right'},
       gutter:{font:'400 10px '+mono,color:this._alpha(dim,.7),minWidth:'22px',textAlign:'right'},
@@ -397,7 +409,12 @@ class Component extends DCLogic {
     const cp=this.cp(); const nameCp=this.state.nameCp; const cpLabel=this.cpDisplay(cp); const f=t._flags;
     const mw = f.listVariant==='table'?'200px':'160px';
     const rows=this.filtered();
-    const visibleRows=rows.map((r,i)=>{
+    this._variant=f.listVariant;
+    const N=rows.length, rowH=this._estRowH(), viewH=this._listH||640, over=Component.OVERSCAN;
+    let winStart=Math.min(Math.max(0, Math.floor(this.state.scrollY/rowH)-over), Math.max(0,N-1));
+    const winCount=Math.max(0, Math.min(N-winStart, Math.ceil(viewH/rowH)+over*2));
+    this._winStart=winStart; this._sliceLen=winCount;
+    const visibleRows=rows.slice(winStart,winStart+winCount).map((r,j)=>{ const i=winStart+j;
       const acc=this.typeColor(r.type);
       const badgeStyle={font:'700 9.5px '+t._flags.mono,color:acc,background:this._alpha(acc,.15),border:'1px solid '+this._alpha(acc,.4),padding:'3px 7px',borderRadius:'5px',textAlign:'center',justifySelf: f.listVariant==='table'?'center':'auto',whiteSpace:'nowrap'};
       const missing=this.isMissing(r); const localeStr=this.localeOf(r);
@@ -449,12 +466,15 @@ class Component extends DCLogic {
       nameCpBtnStyle:{padding:'8px 10px',borderRadius:f.rad+'px',cursor:'pointer',font:'700 11px '+f.mono,whiteSpace:'nowrap',border:'1px solid '+f.bd,background:f.panel2,color:f.dim,minWidth:'66px'},
       search:this.state.search, onSearch:(e)=>this.setState({search:e.target.value}),
       typeFilter:this.state.typeFilter, onType:(e)=>this.setState({typeFilter:e.target.value}),
-      typeOpts:['ALL',...Array.from(new Set(this.state.rows.map(r=>r.type)))],
+      typeOpts:(this._tcache&&this._tcache.rows===this.state.rows)?this._tcache.v:(this._tcache={rows:this.state.rows,v:['ALL',...Array.from(new Set(this.state.rows.map(r=>r.type)))]}).v,
       onToggleMissing:()=>this.setState(s=>({onlyMissing:!s.onlyMissing})),
       missingBtnStyle:{padding:'8px 10px',borderRadius:f.rad+'px',cursor:'pointer',font:'600 11px '+f.sys,whiteSpace:'nowrap',border:'1px solid '+(this.state.onlyMissing?'#e0a030':f.bd),background:this.state.onlyMissing?this._alpha('#e0a030',.15):f.panel2,color:this.state.onlyMissing?'#e0a030':f.dim},
       onAdd:()=>this.add(),
-      visibleRows, empty:visibleRows.length===0,
-      shownCount:visibleRows.length, totalCount:this.state.rows.length,
+      visibleRows, empty:N===0,
+      padTop:{height:(winStart*rowH)+'px'}, padBottom:{height:(Math.max(0,N-winStart-winCount)*rowH)+'px'},
+      setList:(el)=>{ if(el) this._list=el; }, setPadTop:(el)=>{ if(el) this._padT=el; }, setPadBottom:(el)=>{ if(el) this._padB=el; },
+      onListScroll:()=>this._onListScroll(),
+      shownCount:N, totalCount:this.state.rows.length,
       dirtyLabel:this.state.dirty?' · edited':'',
       onExport:()=>this.export(), exportMsg:this.state.exportMsg,
       setRoot:(el)=>this._measure(el),
