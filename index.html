@@ -393,13 +393,14 @@ class Component extends DCLogic {
 
   rowStyle(t, r, idx){
     const f=t._flags, cp=this.cp(); const acc=this.typeColor(r.type);
+    const sel=this.state.editingVnum===r.vnum;
     if(f.listVariant==='cards'){
-      return {display:'flex',alignItems:'center',gap:'10px',padding:'11px 12px 11px 14px',marginBottom:'8px',background:f.panel,border:'1px solid '+f.bd,borderLeft:'3px solid '+acc,borderRadius:f.rad+'px',cursor:'pointer'};
+      return {display:'flex',alignItems:'center',gap:'10px',padding:'11px 12px 11px 14px',marginBottom:'8px',background:sel?this._alpha(f.A,.08):f.panel,border:'1px solid '+(sel?this._alpha(f.A,.55):f.bd),borderLeft:'3px solid '+acc,borderRadius:f.rad+'px',cursor:'pointer'};
     }
     if(f.listVariant==='table'){
-      return {display:'grid',gridTemplateColumns:'62px 1fr 68px 58px',gap:'8px',alignItems:'center',padding:'9px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.7),background: idx%2? f.panel2 : f.panel,cursor:'pointer'};
+      return {display:'grid',gridTemplateColumns:'62px 1fr 68px 58px',gap:'8px',alignItems:'center',padding:'9px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.7),background: sel?this._alpha(f.A,.10):(idx%2? f.panel2 : f.panel),boxShadow: sel?'inset 2px 0 0 '+f.A:'none',cursor:'pointer'};
     }
-    return {display:'flex',alignItems:'center',gap:'10px',padding:'8px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.55),cursor:'pointer',background: 'transparent'};
+    return {display:'flex',alignItems:'center',gap:'10px',padding:'8px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.55),cursor:'pointer',background: sel?this._alpha(f.A,.09):'transparent',boxShadow: sel?'inset 2px 0 0 '+f.A:'none'};
   }
 
   renderVals(){
