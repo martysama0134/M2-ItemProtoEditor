@@ -8,6 +8,9 @@
 <body>
 <x-dc>
 <helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -24,10 +27,15 @@
  <div style="{{ t.leftCol }}">
   <div style="{{ t.head }}">
     <div style="{{ t.headTop }}">
-      <div style="{{ t.title }}">{{ t.titleText }}</div>
+      <div style="{{ t.brand }}">
+        <div style="{{ t.logo }}">{{ t.logoText }}</div>
+        <div>
+          <div style="{{ t.title }}">{{ t.titleText }}</div>
+          <div style="{{ t.headSub }}">item_proto.txt · item_names.txt</div>
+        </div>
+      </div>
       <div style="{{ t.cpBadge }}">{{ cpLabel }}</div>
     </div>
-    <div style="{{ t.headSub }}">item_proto.txt · item_names.txt</div>
   </div>
 
   <div style="{{ t.toolbar }}">
@@ -173,7 +181,7 @@
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:780},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;grid&quot;,&quot;ide&quot;,&quot;fantasy&quot;],&quot;default&quot;:&quot;ide&quot;,&quot;tsType&quot;:&quot;'grid'|'ide'|'fantasy'&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:null,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;desktop&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:null,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:780},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;grid&quot;,&quot;ide&quot;,&quot;fantasy&quot;,&quot;neonnoir&quot;],&quot;default&quot;:&quot;neonnoir&quot;,&quot;tsType&quot;:&quot;'grid'|'ide'|'fantasy'|'neonnoir'&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:null,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;desktop&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:null,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;}}">
 class Component extends DCLogic {
   static DEFAULTS = {vnum:'0',nameK:'',type:'ITEM_NONE',subType:'0',size:'1',antiFlag:'NONE',flag:'NONE',wear:'NONE',immune:'NONE',gold:'0',shopBuy:'0',refine:'0',refineSet:'0',magicPct:'0',limitType0:'LIMIT_NONE',limitValue0:'0',limitType1:'LIMIT_NONE',limitValue1:'0',addonType0:'APPLY_NONE',addonValue0:'0',addonType1:'APPLY_NONE',addonValue1:'0',addonType2:'APPLY_NONE',addonValue2:'0',value0:'0',value1:'0',value2:'0',value3:'0',value4:'0',value5:'0',specular:'0',socket:'0',attuAddon:'0',locale:null,nameK:null};
 
@@ -241,10 +249,9 @@ class Component extends DCLogic {
   componentDidMount(){ this._measureList(); }
   componentDidUpdate(){ this._measureList(); }
   componentWillUnmount(){ if(this._ro) this._ro.disconnect(); if(this._sRaf!=null) cancelAnimationFrame(this._sRaf); }
+
   _measure(el){ if(el && el!==this._root){ this._root=el; if(this._ro) this._ro.disconnect(); this._ro=new ResizeObserver(es=>{ const w=es[0].contentRect.width; const wide=w>=800; if(wide!==this.state.wide) this.setState({wide}); }); this._ro.observe(el); } }
 
-  // Windowed list rendering: only ~viewport+overscan rows exist in the DOM;
-  // spacer divs (padTop/padBottom) keep scrollbar geometry identical to a full render.
   static OVERSCAN = 10;
   static ROW_EST = { rows:50, table:52, cards:66 };
   _estRowH(){ return (this._rowHs && this._rowHs[this._variant]) || Component.ROW_EST[this._variant] || 52; }
@@ -256,7 +263,7 @@ class Component extends DCLogic {
   encStr(s, cp){ if(!s) return true; if(cp==='utf8') return true; for(const ch of String(s)){ if(!this.encChar(ch,cp)) return false; } return true; }
   cpDisplay(cp){ return cp==='utf8' ? 'UTF-8' : 'CP'+cp; }
 
-  decodeName(bytes, cp){ if(!bytes||!bytes.length) return ''; const map={'949':'euc-kr','1252':'windows-1252','1250':'windows-1250','1253':'windows-1253','1254':'windows-1254','1256':'windows-1256','utf8':'utf-8'}; const enc=map[cp]||'windows-1252'; try{ const decs=Component._DECS||(Component._DECS={}); const d=decs[enc]||(decs[enc]=new TextDecoder(enc)); return d.decode(new Uint8Array(bytes)); }catch(e){ return String.fromCharCode(...bytes); } }
+  decodeName(bytes, cp){ if(!bytes||!bytes.length) return ''; const map={'949':'euc-kr','1252':'windows-1252','1250':'windows-1250','1253':'windows-1253','1254':'windows-1254','1256':'windows-1256','utf8':'utf-8'}; const enc=map[cp]||'windows-1252'; try{ const d=(this._dec||(this._dec={}))[enc]||(this._dec[enc]=new TextDecoder(enc)); return d.decode(new Uint8Array(bytes)); }catch(e){ return String.fromCharCode.apply(null,bytes); } }
   nameOf(r){ return r.nameK!=null ? r.nameK : this.decodeName(r.bytes, this.state.nameCp); }
   localeOf(r){ return r.locale!=null ? r.locale : this.decodeName(r.localeBytes, this.cp()); }
   isMissing(r){ const l=this.localeOf(r); return !l || !l.trim(); }
@@ -270,7 +277,8 @@ class Component extends DCLogic {
   _applyNames(rows){ const map=this._namesMap; if(!map) return; rows.forEach(r=>{ if(map[r.vnum]!=null){ r.localeBytes=map[r.vnum]; r.locale=null; } }); }
   loadSample(){ this._namesMap=null; this.setState({ rows: Component.SAMPLE.map(o=>({...Component.DEFAULTS,...o})), dirty:false, editingVnum:null, search:'' }); this.toast('Restored sample data'); }
 
-  filtered(){ const {rows,search,typeFilter,onlyMissing,nameCp,locale}=this.state; const k=[rows,search,typeFilter,onlyMissing,nameCp,locale]; const c=this._fcache; if(c && c.k.every((v,i)=>v===k[i])) return c.v; const q=search.trim().toLowerCase(); const range=q.match(/^(\d+)\s*-\s*(\d+)$/); const v=rows.filter(r=>{ if(typeFilter!=='ALL' && r.type!==typeFilter) return false; if(onlyMissing && !this.isMissing(r)) return false; if(!q) return true; if(range){ const n=parseInt(r.vnum,10); return n>=+range[1] && n<=+range[2]; } return r.vnum.toLowerCase().includes(q) || this.nameOf(r).toLowerCase().includes(q) || this.localeOf(r).toLowerCase().includes(q); }); this._fcache={k,v}; return v; }
+  filtered(){ const {rows,search,typeFilter,onlyMissing,locale,nameCp}=this.state; const key=search+'|'+typeFilter+'|'+onlyMissing+'|'+locale+'|'+nameCp; if(this._fRows===rows && this._fKey===key) return this._fCache; const q=search.trim().toLowerCase(); const range=q.match(/^(\d+)\s*-\s*(\d+)$/); const out=rows.filter(r=>{ if(typeFilter!=='ALL' && r.type!==typeFilter) return false; if(onlyMissing && !this.isMissing(r)) return false; if(!q) return true; if(range){ const n=parseInt(r.vnum,10); return n>=+range[1] && n<=+range[2]; } return r.vnum.toLowerCase().includes(q) || this.nameOf(r).toLowerCase().includes(q) || this.localeOf(r).toLowerCase().includes(q); }); this._fRows=rows; this._fKey=key; this._fCache=out; return out; }
+  typeOpts(){ const rows=this.state.rows; if(this._toRows===rows) return this._toCache; const o=['ALL',...Array.from(new Set(rows.map(r=>r.type)))]; this._toRows=rows; this._toCache=o; return o; }
 
   update(vnum,key,val){ this.setState(s=>({ dirty:true, editingVnum: (key==='vnum'&&s.editingVnum===vnum)?val:s.editingVnum, rows: s.rows.map(r=>{ if(r.vnum!==vnum) return r; const nr={...r,[key]:val}; if(key==='nameK') nr.bytes=null; if(key==='locale') nr.localeBytes=null; return nr; }) })); }
   toggleFlag(vnum,key,opt){ this.setState(s=>({ dirty:true, rows:s.rows.map(r=>{ if(r.vnum!==vnum) return r; const cur=new Set(String(r[key]||'').split('|').map(x=>x.trim()).filter(Boolean)); cur.has(opt)?cur.delete(opt):cur.add(opt); const ordered=(Component.FIELD[key].options||[]).filter(o=>cur.has(o)); return {...r,[key]:ordered.join(' | ')}; }) })); }
@@ -297,9 +305,15 @@ class Component extends DCLogic {
   fmtGold(g){ const n=parseInt(g,10)||0; if(n>=1000000) return (n/1000000).toFixed(n%1000000?1:0)+'M'; if(n>=1000) return (n/1000).toFixed(n%1000?1:0)+'k'; return String(n); }
 
   THEME(theme, accent, wide){
-    const A = accent || ({ide:'#3fb950',grid:'#0969da',fantasy:'#d4af37'})[theme];
+    const A = accent || ({ide:'#3fb950',grid:'#0969da',fantasy:'#d4af37',neonnoir:'#e23c6b'})[theme];
     const mono='ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
     const sys='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    if(theme==='neonnoir'){
+      const bg='#141118', panel='#1a1621', panel2='#100d15', bd='#2a2434', tx='#ece9f0', dim='#8f8899';
+      const nmono="'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace";
+      const nsys="'Manrope', system-ui, -apple-system, sans-serif";
+      return this._pack({theme,A,mono:nmono,sys:nsys,bg,panel,panel2,bd,tx,dim, font:nsys, nameFont:nsys, rad:8, listVariant:'rows', gutter:false, rarity:false, titleText:'Proto Manager', glow:'radial-gradient(900px 500px at 82% -8%, rgba(226,60,107,0.12), transparent 60%)', logo:'M2', zebra:false, wide});
+    }
     if(theme==='ide'){
       const bg='#0d1117', panel='#161b22', panel2='#0d1117', bd='#30363d', tx='#c9d1d9', dim='#8b949e';
       return this._pack({theme,A,mono,sys,bg,panel,panel2,bd,tx,dim, font:mono, nameFont:mono, rad:6, listVariant:'rows', gutter:true, rarity:false, titleText:'item_proto · editor', zebra:false, wide});
@@ -313,13 +327,14 @@ class Component extends DCLogic {
   }
   _pack(c){
     const {A,mono,sys,bg,panel,panel2,bd,tx,dim,font,nameFont,rad}=c; const wide=c.wide;
+    const glowBg = c.glow ? (c.glow + ', ' + bg) : bg;
     const ctrlBase={width:'100%',padding:'8px 10px',borderRadius:rad+'px',border:'1px solid '+bd,background:panel2,color:tx,font:'500 12px '+sys,outline:'none'};
     const btn={padding:'8px 12px',borderRadius:rad+'px',border:'1px solid '+bd,cursor:'pointer',font:'600 12px '+sys,whiteSpace:'nowrap'};
     return {
       _flags:c, isTable:c.listVariant==='table', showGutter:c.gutter,
       page: wide
-        ? {display:'flex',flexDirection:'row',height:'100%',minHeight:'560px',background:bg,color:tx,fontFamily:sys,position:'relative',overflow:'hidden',borderRadius:'2px'}
-        : {display:'flex',flexDirection:'column',height:'100%',minHeight:'640px',background:bg,color:tx,fontFamily:sys,position:'relative',overflow:'hidden',borderRadius:'2px'},
+        ? {display:'flex',flexDirection:'row',height:'100%',minHeight:'560px',background:glowBg,color:tx,fontFamily:sys,position:'relative',overflow:'hidden',borderRadius:'2px'}
+        : {display:'flex',flexDirection:'column',height:'100%',minHeight:'640px',background:glowBg,color:tx,fontFamily:sys,position:'relative',overflow:'hidden',borderRadius:'2px'},
       leftCol: wide
         ? {display:'flex',flexDirection:'column',height:'100%',width:'clamp(400px, 36%, 520px)',flexShrink:'0',minWidth:'0',borderRight:'1px solid '+bd}
         : {display:'flex',flexDirection:'column',flex:'1',minHeight:'0',height:'100%'},
@@ -328,19 +343,22 @@ class Component extends DCLogic {
         : {position:'absolute',top:'0',right:'0',bottom:'0',width:'88%',maxWidth:'400px',background:panel,borderLeft:'1px solid '+bd,display:'flex',flexDirection:'column',zIndex:'10',boxShadow:'-8px 0 32px rgba(0,0,0,.35)'},
       panelEmpty:{flex:'1',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'12px',padding:'40px',textAlign:'center',font:'500 13px '+sys,color:dim,lineHeight:'1.6',maxWidth:'340px',margin:'0 auto'},
       panelEmptyIcon:{font:'300 46px '+mono,color:this._alpha(A,.5)},
-      head:{padding:'14px 16px 10px',borderBottom:'1px solid '+bd,background:panel},
+      head:{padding:'12px 16px',borderBottom:'1px solid '+bd,background: c.theme==='neonnoir' ? 'linear-gradient(180deg, '+panel+', '+panel2+')' : panel},
       headTop:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'},
-      title:{font:'700 15px '+(c.theme==='fantasy'?nameFont:font),letterSpacing:c.theme==='ide'?'0.5px':'0',color:tx},
+      brand:{display:'flex',alignItems:'center',gap:'11px',minWidth:'0'},
+      logo:{width:'34px',height:'34px',flexShrink:'0',borderRadius:'9px',background:'linear-gradient(135deg, '+A+', rgba(0,0,0,0.42))',display: c.logo?'flex':'none',alignItems:'center',justifyContent:'center',color:'#fff',font:'700 14px '+mono,boxShadow:'0 2px 12px '+this._alpha(A,.4)},
+      logoText:c.logo||'',
+      title:{font:'800 15px '+(c.theme==='fantasy'?nameFont:font),letterSpacing:c.theme==='ide'?'0.5px':'-0.2px',color:tx},
       titleText:c.titleText,
       cpBadge:{font:'700 10px '+mono,color:A,background:this._alpha(A,.14),border:'1px solid '+this._alpha(A,.4),padding:'3px 7px',borderRadius:'20px',whiteSpace:'nowrap'},
-      headSub:{font:'400 11px '+mono,color:dim,marginTop:'3px'},
+      headSub:{font:'400 11px '+mono,color:dim,marginTop:'2px'},
       toolbar:{display:'flex',flexDirection:'column',gap:'8px',padding:'12px 16px',borderBottom:'1px solid '+bd,background:panel},
       ioRow:{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'},
       ioSpacer:{flex:'1',minWidth:'0'},
       hiddenFile:{position:'absolute',width:'1px',height:'1px',opacity:'0',pointerEvents:'none'},
       loadBtn:{...btn,display:'inline-flex',alignItems:'center',background:panel2,color:tx,border:'1px solid '+bd},
       ghostBtn:{...btn,background:'transparent',color:dim,border:'1px dashed '+bd},
-      exportBtnTop:{...btn,background:A,color:c.theme==='fantasy'?'#1a140a':(c.theme==='grid'?'#fff':'#0d1117'),border:'1px solid '+A},
+      exportBtnTop:{...btn,background:A,color:c.theme==='fantasy'?'#1a140a':((c.theme==='grid'||c.theme==='neonnoir')?'#fff':'#0d1117'),border:'1px solid '+A},
       ctrlRow:{display:'flex',flexDirection:'column',gap:'4px'},
       ctrlRow2:{display:'flex',gap:'8px',alignItems:'stretch'},
       ctrlLabel:{font:'600 10px '+sys,textTransform:'uppercase',letterSpacing:'.6px',color:dim},
@@ -349,7 +367,7 @@ class Component extends DCLogic {
       dualLabel:{display:'flex',justifyContent:'space-between',gap:'8px'},
       dualCtrl:{display:'flex',gap:'8px',alignItems:'stretch'},
       searchInput:{...ctrlBase},
-      addBtn:{...btn,background:A,color:c.theme==='fantasy'?'#1a140a':(c.theme==='grid'?'#fff':'#0d1117'),border:'1px solid '+A},
+      addBtn:{...btn,background:A,color:c.theme==='fantasy'?'#1a140a':((c.theme==='grid'||c.theme==='neonnoir')?'#fff':'#0d1117'),border:'1px solid '+A},
       legend:{display:'flex',gap:'14px',padding:'8px 16px',borderBottom:'1px solid '+bd,background:panel2,flexWrap:'wrap'},
       legendItem:{display:'flex',alignItems:'center',gap:'5px',font:'500 10px '+sys,color:dim},
       legendDotSafe:{width:'8px',height:'8px',borderRadius:'50%',background:'#3fb27f',display:'inline-block'},
@@ -358,7 +376,7 @@ class Component extends DCLogic {
       headerRow:{display:'grid',gridTemplateColumns:'62px 1fr 68px 58px',gap:'8px',padding:'8px 16px',position:'sticky',top:'0',background:panel2,borderBottom:'1px solid '+bd,font:'700 9.5px '+sys,letterSpacing:'.5px',color:dim,zIndex:'1'},
       thVnum:{}, thName:{}, thType:{textAlign:'center'}, thGold:{textAlign:'right'},
       gutter:{font:'400 10px '+mono,color:this._alpha(dim,.7),minWidth:'22px',textAlign:'right'},
-      vnum:{font:'600 12px '+mono,color:c.theme==='grid'?tx:A,minWidth:'46px'},
+      vnum:{font:'600 12px '+mono,color:c.theme==='grid'?tx:(c.theme==='neonnoir'?'#e6b34a':A),minWidth:'46px'},
       nameCell:{flex:'1',minWidth:'0',display:'flex',flexDirection:'column',gap:'1px'},
       nameLine:{display:'flex',alignItems:'center',gap:'5px'},
       warnDot:{color:'#e0a030',fontSize:'11px',flexShrink:'0'},
@@ -366,7 +384,7 @@ class Component extends DCLogic {
       gold:{font:'600 11px '+mono,color:c.theme==='fantasy'?A:dim,textAlign:'right',minWidth:'44px'},
       footer:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 16px',borderTop:'1px solid '+bd,background:panel,gap:'8px'},
       count:{font:'500 11px '+mono,color:dim},
-      exportBtn:{...btn,background:A,color:c.theme==='fantasy'?'#1a140a':(c.theme==='grid'?'#fff':'#0d1117'),border:'1px solid '+A},
+      exportBtn:{...btn,background:A,color:c.theme==='fantasy'?'#1a140a':((c.theme==='grid'||c.theme==='neonnoir')?'#fff':'#0d1117'),border:'1px solid '+A},
       emptyState:{padding:'40px 16px',textAlign:'center',font:'500 12px '+sys,color:dim},
       toast:{position:'absolute',left:'12px',right:'12px',bottom:'66px',padding:'10px 12px',borderRadius:rad+'px',background:c.theme==='grid'?'#1f2328':'#000',color:'#fff',font:'500 11px '+sys,textAlign:'center',boxShadow:'0 6px 24px rgba(0,0,0,.4)',zIndex:'6'},
       overlay:{position:'absolute',inset:'0',background:'rgba(0,0,0,.5)',zIndex:'9'},
@@ -385,7 +403,7 @@ class Component extends DCLogic {
       input:{...ctrlBase,padding:'7px 9px',font:'500 12px '+mono},
       delBtn:{...btn,background:'transparent',color:'#e0574f',border:'1px solid '+this._alpha('#e0574f',.5)},
       cloneBtn:{...btn,background:'transparent',color:tx,border:'1px solid '+bd},
-      doneBtn:{...btn,flex:'1',background:A,color:c.theme==='fantasy'?'#1a140a':(c.theme==='grid'?'#fff':'#0d1117'),border:'1px solid '+A},
+      doneBtn:{...btn,flex:'1',background:A,color:c.theme==='fantasy'?'#1a140a':((c.theme==='grid'||c.theme==='neonnoir')?'#fff':'#0d1117'),border:'1px solid '+A},
       drawerFoot:{display:'flex',gap:'8px',padding:'12px 16px',borderTop:'1px solid '+bd,background:panel2}
     };
   }
@@ -393,14 +411,13 @@ class Component extends DCLogic {
 
   rowStyle(t, r, idx){
     const f=t._flags, cp=this.cp(); const acc=this.typeColor(r.type);
-    const sel=this.state.editingVnum===r.vnum;
     if(f.listVariant==='cards'){
-      return {display:'flex',alignItems:'center',gap:'10px',padding:'11px 12px 11px 14px',marginBottom:'8px',background:sel?this._alpha(f.A,.08):f.panel,border:'1px solid '+(sel?this._alpha(f.A,.55):f.bd),borderLeft:'3px solid '+acc,borderRadius:f.rad+'px',cursor:'pointer'};
+      return {display:'flex',alignItems:'center',gap:'10px',padding:'11px 12px 11px 14px',marginBottom:'8px',background:f.panel,border:'1px solid '+f.bd,borderLeft:'3px solid '+acc,borderRadius:f.rad+'px',cursor:'pointer'};
     }
     if(f.listVariant==='table'){
-      return {display:'grid',gridTemplateColumns:'62px 1fr 68px 58px',gap:'8px',alignItems:'center',padding:'9px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.7),background: sel?this._alpha(f.A,.10):(idx%2? f.panel2 : f.panel),boxShadow: sel?'inset 2px 0 0 '+f.A:'none',cursor:'pointer'};
+      return {display:'grid',gridTemplateColumns:'62px 1fr 68px 58px',gap:'8px',alignItems:'center',padding:'9px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.7),background: idx%2? f.panel2 : f.panel,cursor:'pointer'};
     }
-    return {display:'flex',alignItems:'center',gap:'10px',padding:'8px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.55),cursor:'pointer',background: sel?this._alpha(f.A,.09):'transparent',boxShadow: sel?'inset 2px 0 0 '+f.A:'none'};
+    return {display:'flex',alignItems:'center',gap:'10px',padding:'8px 16px',borderBottom:'1px solid '+this._alpha(f.bd,.55),cursor:'pointer',background: 'transparent'};
   }
 
   renderVals(){
@@ -412,15 +429,19 @@ class Component extends DCLogic {
     const rows=this.filtered();
     this._variant=f.listVariant;
     const N=rows.length, rowH=this._estRowH(), viewH=this._listH||640, over=Component.OVERSCAN;
-    let winStart=Math.min(Math.max(0, Math.floor(this.state.scrollY/rowH)-over), Math.max(0,N-1));
+    const winStart=Math.min(Math.max(0, Math.floor(this.state.scrollY/rowH)-over), Math.max(0,N-1));
     const winCount=Math.max(0, Math.min(N-winStart, Math.ceil(viewH/rowH)+over*2));
     this._winStart=winStart; this._sliceLen=winCount;
-    const visibleRows=rows.slice(winStart,winStart+winCount).map((r,j)=>{ const i=winStart+j;
+    const editingVnum=this.state.editingVnum;
+    const visibleRows=rows.slice(winStart,winStart+winCount).map((r,j)=>{
+      const idxAbs=winStart+j;
       const acc=this.typeColor(r.type);
       const badgeStyle={font:'700 9.5px '+t._flags.mono,color:acc,background:this._alpha(acc,.15),border:'1px solid '+this._alpha(acc,.4),padding:'3px 7px',borderRadius:'5px',textAlign:'center',justifySelf: f.listVariant==='table'?'center':'auto',whiteSpace:'nowrap'};
       const missing=this.isMissing(r); const localeStr=this.localeOf(r);
+      let style=this.rowStyle(t,r,idxAbs);
+      if(r.vnum===editingVnum) style={...style, background:this._alpha(f.A,.16), boxShadow:'inset 3px 0 0 '+f.A};
       return {
-        vnum:r.vnum, idx:String(i+1).padStart(2,'0'),
+        vnum:r.vnum, idx:String(idxAbs+1).padStart(2,'0'),
         primary: missing? '⌀ untranslated' : localeStr,
         primaryWarn: !missing && r.locale!=null && !this.encStr(r.locale,cp),
         primaryStyle:{font:'600 13px '+f.nameFont,color: missing? '#e0a030' : f.tx,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:mw},
@@ -429,10 +450,11 @@ class Component extends DCLogic {
         secondaryStyle:{font:'400 11px '+f.mono,color:f.dim,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:mw},
         typeShort:this.short(r.type), badgeStyle,
         goldLabel:this.fmtGold(r.gold),
-        style:this.rowStyle(t,r,i),
+        style,
         onClick:()=>this.setState({editingVnum:r.vnum})
       };
     });
+
     const editRow=this.state.editingVnum!=null? this.state.rows.find(r=>r.vnum===this.state.editingVnum):null;
     const inputStyle=t.input; const A=t._flags.A;
     const chip=(on)=>({font:'600 10px '+f.mono,padding:'5px 9px',borderRadius:f.rad+'px',cursor:'pointer',whiteSpace:'nowrap',border:'1px solid '+(on?A:f.bd),background:on?this._alpha(A,.16):f.panel2,color:on?A:f.dim});
@@ -467,7 +489,7 @@ class Component extends DCLogic {
       nameCpBtnStyle:{padding:'8px 10px',borderRadius:f.rad+'px',cursor:'pointer',font:'700 11px '+f.mono,whiteSpace:'nowrap',border:'1px solid '+f.bd,background:f.panel2,color:f.dim,minWidth:'66px'},
       search:this.state.search, onSearch:(e)=>this.setState({search:e.target.value}),
       typeFilter:this.state.typeFilter, onType:(e)=>this.setState({typeFilter:e.target.value}),
-      typeOpts:(this._tcache&&this._tcache.rows===this.state.rows)?this._tcache.v:(this._tcache={rows:this.state.rows,v:['ALL',...Array.from(new Set(this.state.rows.map(r=>r.type)))]}).v,
+      typeOpts:this.typeOpts(),
       onToggleMissing:()=>this.setState(s=>({onlyMissing:!s.onlyMissing})),
       missingBtnStyle:{padding:'8px 10px',borderRadius:f.rad+'px',cursor:'pointer',font:'600 11px '+f.sys,whiteSpace:'nowrap',border:'1px solid '+(this.state.onlyMissing?'#e0a030':f.bd),background:this.state.onlyMissing?this._alpha('#e0a030',.15):f.panel2,color:this.state.onlyMissing?'#e0a030':f.dim},
       onAdd:()=>this.add(),
