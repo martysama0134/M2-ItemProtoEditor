@@ -244,7 +244,11 @@ class Component extends DCLogic {
     {title:'Misc', keys:['specular','socket','attuAddon']}
   ];
 
-  state = { rows: Component.SAMPLE.map(o=>({...Component.DEFAULTS,...o})), locale:'en', nameCp:'1252', search:'', typeFilter:'ALL', onlyMissing:false, editingVnum:null, exportMsg:'', dirty:false, wide:false, scrollY:0 };
+  // rows are identified by a stable internal _id, never by vnum: vnum is editable and may collide mid-typing
+  static _seq = 0;
+  static mkRow(o){ return {...Component.DEFAULTS,...o,_id:++Component._seq}; }
+
+  state = { rows: Component.SAMPLE.map(o=>Component.mkRow(o)), locale:'en', nameCp:'1252', search:'', typeFilter:'ALL', onlyMissing:false, editingId:null, exportMsg:'', dirty:false, wide:false, scrollY:0 };
 
   componentDidMount(){ this._measureList(); }
   componentDidUpdate(){ this._measureList(); }
@@ -272,20 +276,20 @@ class Component extends DCLogic {
   onLoadNames(e){ const file=e.target.files&&e.target.files[0]; if(!file) return; const rd=new FileReader(); rd.onload=()=>this.parseNames(new Uint8Array(rd.result), file.name); rd.readAsArrayBuffer(file); e.target.value=''; }
   _splitLine(buf,start,end){ const fields=[]; let fs=start; for(let k=start;k<=end;k++){ if(k===end||buf[k]===9){ let fe=k; if(fe>fs && buf[fe-1]===13) fe--; fields.push([fs,fe]); fs=k+1; } } return fields; }
   _ascii(buf,a,b){ let s=''; for(let k=a;k<b;k++) s+=String.fromCharCode(buf[k]); return s.trim(); }
-  parseProto(buf, fname){ const rows=[]; let start=0, ln=0; for(let i=0;i<=buf.length;i++){ if(i===buf.length||buf[i]===10){ if(i>start+1||(i>start&&buf[start]!==13)){ if(ln>0){ const fl=this._splitLine(buf,start,i); if(fl.length>1 && (fl[0][1]>fl[0][0])){ const row={...Component.DEFAULTS}; row.vnum=this._ascii(buf,fl[0][0],fl[0][1]); const nb=[]; for(let k=fl[1][0];k<fl[1][1];k++) nb.push(buf[k]); row.bytes=nb.length?nb:null; row.nameK=null; for(let ci=2; ci<Component.COLS.length && ci<fl.length; ci++){ row[Component.COLS[ci]]=this._ascii(buf,fl[ci][0],fl[ci][1]); } if(row.vnum) rows.push(row); } } ln++; } start=i+1; } } if(!rows.length){ this.toast('No rows parsed — is this an item_proto.txt?'); return; } this._applyNames(rows); this.setState({rows, dirty:false, editingVnum:null, search:''}); this.toast('Loaded '+rows.length+' items from '+fname); }
+  parseProto(buf, fname){ const rows=[]; let start=0, ln=0; for(let i=0;i<=buf.length;i++){ if(i===buf.length||buf[i]===10){ if(i>start+1||(i>start&&buf[start]!==13)){ if(ln>0){ const fl=this._splitLine(buf,start,i); if(fl.length>1 && (fl[0][1]>fl[0][0])){ const row=Component.mkRow(); row.vnum=this._ascii(buf,fl[0][0],fl[0][1]); const nb=[]; for(let k=fl[1][0];k<fl[1][1];k++) nb.push(buf[k]); row.bytes=nb.length?nb:null; row.nameK=null; for(let ci=2; ci<Component.COLS.length && ci<fl.length; ci++){ row[Component.COLS[ci]]=this._ascii(buf,fl[ci][0],fl[ci][1]); } if(row.vnum) rows.push(row); } } ln++; } start=i+1; } } if(!rows.length){ this.toast('No rows parsed — is this an item_proto.txt?'); return; } this._applyNames(rows); this.setState({rows, dirty:false, editingId:null, search:''}); this.toast('Loaded '+rows.length+' items from '+fname); }
   parseNames(buf, fname){ const map={}; let start=0, ln=0, n=0; for(let i=0;i<=buf.length;i++){ if(i===buf.length||buf[i]===10){ if(i>start){ if(ln>0){ const fl=this._splitLine(buf,start,i); if(fl.length>=2){ const vn=this._ascii(buf,fl[0][0],fl[0][1]); const lb=[]; for(let k=fl[1][0];k<fl[1][1];k++) lb.push(buf[k]); if(vn){ map[vn]=lb; n++; } } } ln++; } start=i+1; } } this._namesMap=map; this.setState(s=>({ rows: s.rows.map(r=> map[r.vnum]!=null ? {...r, localeBytes:map[r.vnum], locale:null} : r) })); this.toast('Loaded '+n+' locale names from '+fname); }
   _applyNames(rows){ const map=this._namesMap; if(!map) return; rows.forEach(r=>{ if(map[r.vnum]!=null){ r.localeBytes=map[r.vnum]; r.locale=null; } }); }
-  loadSample(){ this._namesMap=null; this.setState({ rows: Component.SAMPLE.map(o=>({...Component.DEFAULTS,...o})), dirty:false, editingVnum:null, search:'' }); this.toast('Restored sample data'); }
+  loadSample(){ this._namesMap=null; this.setState({ rows: Component.SAMPLE.map(o=>Component.mkRow(o)), dirty:false, editingId:null, search:'' }); this.toast('Restored sample data'); }
 
   filtered(){ const {rows,search,typeFilter,onlyMissing,locale,nameCp}=this.state; const key=search+'|'+typeFilter+'|'+onlyMissing+'|'+locale+'|'+nameCp; if(this._fRows===rows && this._fKey===key) return this._fCache; const q=search.trim().toLowerCase(); const range=q.match(/^(\d+)\s*-\s*(\d+)$/); const out=rows.filter(r=>{ if(typeFilter!=='ALL' && r.type!==typeFilter) return false; if(onlyMissing && !this.isMissing(r)) return false; if(!q) return true; if(range){ const n=parseInt(r.vnum,10); return n>=+range[1] && n<=+range[2]; } return r.vnum.toLowerCase().includes(q) || this.nameOf(r).toLowerCase().includes(q) || this.localeOf(r).toLowerCase().includes(q); }); this._fRows=rows; this._fKey=key; this._fCache=out; return out; }
   typeOpts(){ const rows=this.state.rows; if(this._toRows===rows) return this._toCache; const o=['ALL',...Array.from(new Set(rows.map(r=>r.type)))]; this._toRows=rows; this._toCache=o; return o; }
 
-  update(vnum,key,val){ this.setState(s=>({ dirty:true, editingVnum: (key==='vnum'&&s.editingVnum===vnum)?val:s.editingVnum, rows: s.rows.map(r=>{ if(r.vnum!==vnum) return r; const nr={...r,[key]:val}; if(key==='nameK') nr.bytes=null; if(key==='locale') nr.localeBytes=null; return nr; }) })); }
-  toggleFlag(vnum,key,opt){ this.setState(s=>({ dirty:true, rows:s.rows.map(r=>{ if(r.vnum!==vnum) return r; const cur=new Set(String(r[key]||'').split('|').map(x=>x.trim()).filter(Boolean)); cur.has(opt)?cur.delete(opt):cur.add(opt); const ordered=(Component.FIELD[key].options||[]).filter(o=>cur.has(o)); return {...r,[key]:ordered.join(' | ')}; }) })); }
+  update(id,key,val){ this.setState(s=>({ dirty:true, rows: s.rows.map(r=>{ if(r._id!==id) return r; const nr={...r,[key]:val}; if(key==='nameK') nr.bytes=null; if(key==='locale') nr.localeBytes=null; return nr; }) })); }
+  toggleFlag(id,key,opt){ this.setState(s=>({ dirty:true, rows:s.rows.map(r=>{ if(r._id!==id) return r; const cur=new Set(String(r[key]||'').split('|').map(x=>x.trim()).filter(Boolean)); cur.has(opt)?cur.delete(opt):cur.add(opt); const ordered=(Component.FIELD[key].options||[]).filter(o=>cur.has(o)); return {...r,[key]:ordered.join(' | ')}; }) })); }
   nextVnum(){ const m=this.state.rows.reduce((a,r)=>Math.max(a, parseInt(r.vnum,10)||0),0); return String(m+1); }
-  add(){ const v=this.nextVnum(); this.setState(s=>({ dirty:true, editingVnum:v, rows:[{...Component.DEFAULTS,vnum:v,type:'ITEM_WEAPON'}, ...s.rows] })); }
-  clone(){ const src=this.state.rows.find(r=>r.vnum===this.state.editingVnum); if(!src) return; const v=this.nextVnum(); const i=this.state.rows.indexOf(src); this.setState(s=>{ const rows=s.rows.slice(); rows.splice(i+1,0,{...src,vnum:v}); return {dirty:true,editingVnum:v,rows}; }); }
-  del(){ const v=this.state.editingVnum; this.setState(s=>({dirty:true,editingVnum:null,rows:s.rows.filter(r=>r.vnum!==v)})); }
+  add(){ const row=Component.mkRow({vnum:this.nextVnum(),type:'ITEM_WEAPON'}); this.setState(s=>({ dirty:true, editingId:row._id, rows:[row, ...s.rows] })); }
+  clone(){ const src=this.state.rows.find(r=>r._id===this.state.editingId); if(!src) return; const row=Component.mkRow({...src,vnum:this.nextVnum()}); const i=this.state.rows.indexOf(src); this.setState(s=>{ const rows=s.rows.slice(); rows.splice(i+1,0,row); return {dirty:true,editingId:row._id,rows}; }); }
+  del(){ const id=this.state.editingId; this.setState(s=>({dirty:true,editingId:null,rows:s.rows.filter(r=>r._id!==id)})); }
   toast(msg){ this.setState({exportMsg:msg}); clearTimeout(this._tt); this._tt=setTimeout(()=>this.setState({exportMsg:''}),3600); }
 
   _encField(str, cp, tally){ const o=[]; for(const ch of String(str)){ const c=ch.codePointAt(0); if(c<128){ o.push(c); } else if(c<256){ o.push(c); } else { tally.bad++; for(const b of new TextEncoder().encode(ch)) o.push(b); } } return o; }
@@ -432,14 +436,14 @@ class Component extends DCLogic {
     const winStart=Math.min(Math.max(0, Math.floor(this.state.scrollY/rowH)-over), Math.max(0,N-1));
     const winCount=Math.max(0, Math.min(N-winStart, Math.ceil(viewH/rowH)+over*2));
     this._winStart=winStart; this._sliceLen=winCount;
-    const editingVnum=this.state.editingVnum;
+    const editingId=this.state.editingId;
     const visibleRows=rows.slice(winStart,winStart+winCount).map((r,j)=>{
       const idxAbs=winStart+j;
       const acc=this.typeColor(r.type);
       const badgeStyle={font:'700 9.5px '+t._flags.mono,color:acc,background:this._alpha(acc,.15),border:'1px solid '+this._alpha(acc,.4),padding:'3px 7px',borderRadius:'5px',textAlign:'center',justifySelf: f.listVariant==='table'?'center':'auto',whiteSpace:'nowrap'};
       const missing=this.isMissing(r); const localeStr=this.localeOf(r);
       let style=this.rowStyle(t,r,idxAbs);
-      if(r.vnum===editingVnum) style={...style, background:this._alpha(f.A,.16), boxShadow:'inset 3px 0 0 '+f.A};
+      if(r._id===editingId) style={...style, background:this._alpha(f.A,.16), boxShadow:'inset 3px 0 0 '+f.A};
       return {
         vnum:r.vnum, idx:String(idxAbs+1).padStart(2,'0'),
         primary: missing? '⌀ untranslated' : localeStr,
@@ -451,11 +455,11 @@ class Component extends DCLogic {
         typeShort:this.short(r.type), badgeStyle,
         goldLabel:this.fmtGold(r.gold),
         style,
-        onClick:()=>this.setState({editingVnum:r.vnum})
+        onClick:()=>this.setState({editingId:r._id})
       };
     });
 
-    const editRow=this.state.editingVnum!=null? this.state.rows.find(r=>r.vnum===this.state.editingVnum):null;
+    const editRow=editingId!=null? this.state.rows.find(r=>r._id===editingId):null;
     const inputStyle=t.input; const A=t._flags.A;
     const chip=(on)=>({font:'600 10px '+f.mono,padding:'5px 9px',borderRadius:f.rad+'px',cursor:'pointer',whiteSpace:'nowrap',border:'1px solid '+(on?A:f.bd),background:on?this._alpha(A,.16):f.panel2,color:on?A:f.dim});
     const editGroups= editRow? Component.GROUPS.map(g=>({ title:g.title, fields:g.keys.map(k=>{
@@ -463,7 +467,7 @@ class Component extends DCLogic {
       const isEnum=meta.kind==='enum', isFlags=meta.kind==='flags';
       if(isFlags){
         const cur=new Set(String(editRow[k]||'').split('|').map(x=>x.trim()).filter(Boolean));
-        const chips=(meta.options||[]).map(opt=>({ label:opt.replace(/^ANTI_|^ITEM_/,''), title:opt, on:cur.has(opt), style:chip(cur.has(opt)), onToggle:()=>this.toggleFlag(editRow.vnum,k,opt) }));
+        const chips=(meta.options||[]).map(opt=>({ label:opt.replace(/^ANTI_|^ITEM_/,''), title:opt, on:cur.has(opt), style:chip(cur.has(opt)), onToggle:()=>this.toggleFlag(editRow._id,k,opt) }));
         return { key:k, label:meta.label+' · '+cur.size, isEnum:false, isText:false, isFlags:true, chips, wrapStyle:{gridColumn:'1 / -1'} };
       }
       const value = k==='nameK' ? this.nameOf(editRow) : (k==='locale' ? this.localeOf(editRow) : String(editRow[k]??''));
@@ -476,7 +480,7 @@ class Component extends DCLogic {
         inputMode: meta.kind==='num'?'numeric':'text',
         inputStyle: warn? {...inputStyle,border:'1px solid #e0a030',background:this._alpha('#e0a030',.08)} : inputStyle,
         wrapStyle:{gridColumn: (meta.span===2?'1 / -1':'auto')},
-        onInput:(e)=>this.update(editRow.vnum,k,e.target.value) };
+        onInput:(e)=>this.update(editRow._id,k,e.target.value) };
     })})):[];
 
     return {
@@ -503,7 +507,7 @@ class Component extends DCLogic {
       setRoot:(el)=>this._measure(el),
       wide, showPanel: wide || !!editRow, showOverlay: !wide && !!editRow, panelEmpty: wide && !editRow, closeLabel: wide ? '✕ Close' : '✕',
       editing:!!editRow, editVnum:editRow?editRow.vnum:'', editName:editRow?(this.localeOf(editRow)||this.nameOf(editRow)||'New item'):'',
-      editGroups, onClose:()=>this.setState({editingVnum:null}), onDelete:()=>this.del(), onClone:()=>this.clone()
+      editGroups, onClose:()=>this.setState({editingId:null}), onDelete:()=>this.del(), onClone:()=>this.clone()
     };
   }
 }
